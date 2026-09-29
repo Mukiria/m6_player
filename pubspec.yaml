@@ -1,5 +1,5 @@
 name: m6player
-description: "A new Flutter project."
+description: "m6 player: a local MP3 player and internet radio for Android and iOS."
 publish_to: 'none'
 
 version: 1.0.0+1

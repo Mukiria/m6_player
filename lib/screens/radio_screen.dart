@@ -137,7 +137,8 @@ class _RadioScreenState extends State<RadioScreen> {
             children: [
               Container(
                 width: double.infinity,
-                padding: EdgeInsets.symmetric(vertical: 20, horizontal: 20),
+                // Extended up behind the status bar
+                padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 20, 20, 20),
                 decoration: BoxDecoration(
                   color: Color(0xFFA20CA2),
                   borderRadius: BorderRadius.only(
@@ -192,72 +193,69 @@ class _RadioScreenState extends State<RadioScreen> {
                   ],
                 ),
               ),
-            ],
-          ),
 
-          // ✅ Loading & Radio List (kept below the header so search stays visible)
-          Positioned(
-            top: 180,
-            left: 0,
-            right: 0,
-            bottom: 100,
-            child: _isLoading
-                ? Center(child: CircularProgressIndicator())
-                : _filteredStations.isEmpty
-                    ? Center(
-                        child: Text(
-                          "No radio stations found for $_userCountry.",
-                          style: TextStyle(color: Colors.white, fontSize: 18),
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: _filteredStations.length,
-                        itemBuilder: (context, index) {
-                          RadioStation station = _filteredStations[index];
-                          bool isCurrent = _currentRadioUrl == station.url && !_service.isLibraryActive;
-                          return ListTile(
-                            title: Text(
-                              station.name,
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+              // ✅ Loading & Radio List
+              Expanded(
+                child: _isLoading
+                    ? Center(child: CircularProgressIndicator())
+                    : _filteredStations.isEmpty
+                        ? Center(
+                            child: Text(
+                              "No radio stations found for $_userCountry.",
+                              style: TextStyle(color: Colors.white, fontSize: 18),
                             ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: Icon(
-                                    isCurrent && _isPlaying ? Icons.pause : Icons.play_arrow,
-                                    color: Colors.white,
-                                  ),
-                                  onPressed: () => playRadio(station),
+                          )
+                        : ListView.builder(
+                            padding: EdgeInsets.zero,
+                            itemCount: _filteredStations.length,
+                            itemBuilder: (context, index) {
+                              RadioStation station = _filteredStations[index];
+                              bool isCurrent = _currentRadioUrl == station.url && !_service.isLibraryActive;
+                              return ListTile(
+                                title: Text(
+                                  station.name,
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                                 ),
-                                IconButton(
-                                  icon: Icon(Icons.stop, color: Colors.red),
-                                  onPressed: stopRadio, // ✅ Stop button added
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: Icon(
+                                        isCurrent && _isPlaying ? Icons.pause : Icons.play_arrow,
+                                        color: Colors.white,
+                                      ),
+                                      onPressed: () => playRadio(station),
+                                    ),
+                                    IconButton(
+                                      icon: Icon(Icons.stop, color: Colors.red),
+                                      onPressed: stopRadio, // ✅ Stop button added
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-          ),
+                              );
+                            },
+                          ),
+              ),
 
-          // ✅ Stop Button
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 0),
-              child: Container(
-                width: MediaQuery.of(context).size.width * 1,
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Color(0xFFA20CA2),
-                ),
-                child: IconButton(
-                  icon: Icon(Icons.stop, color: Colors.white, size: 30),
-                  onPressed: stopRadio,
+              // ✅ Stop Button, extended down behind the navigation bar
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 0),
+                  child: Container(
+                    width: MediaQuery.of(context).size.width * 1,
+                    padding: EdgeInsets.fromLTRB(20, 10, 20, MediaQuery.of(context).padding.bottom + 10),
+                    decoration: BoxDecoration(
+                      color: Color(0xFFA20CA2),
+                    ),
+                    child: IconButton(
+                      icon: Icon(Icons.stop, color: Colors.white, size: 30),
+                      onPressed: stopRadio,
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         ],
       ),

@@ -18,7 +18,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Music Player',
+      title: 'm6 player',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Color(0xFFF1552C)),
       ),
