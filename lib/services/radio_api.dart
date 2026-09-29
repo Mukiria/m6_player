@@ -19,6 +19,7 @@ Future<List<RadioStation>> fetchStations(String countryCode) async {
       'hidebroken': 'true',
       'order': 'clickcount',
       'reverse': 'true',
+      'limit': '500',
     }),
     headers: {'User-Agent': 'm6player/1.0'},
   );
@@ -28,9 +29,12 @@ Future<List<RadioStation>> fetchStations(String countryCode) async {
   return parseStations(response.body);
 }
 
-/// Parses a radio-browser station list, skipping stations without a stream URL.
+/// Parses a radio-browser station list into playable stations: only HTTPS
+/// streams (plain HTTP is blocked on iOS and Android), one entry per stream
+/// URL (the list is sorted by popularity, so the most popular entry is kept).
 List<RadioStation> parseStations(String body) {
   List<dynamic> data = json.decode(body);
+  Set<String> seenUrls = {};
   return data
       .map((station) => RadioStation(
             name: (station["name"] as String?)?.trim().isNotEmpty == true
@@ -39,6 +43,6 @@ List<RadioStation> parseStations(String body) {
             url: station["url_resolved"] ?? "",
             country: station["country"] ?? "",
           ))
-      .where((station) => station.url.isNotEmpty)
+      .where((station) => station.url.startsWith("https://") && seenUrls.add(station.url))
       .toList();
 }

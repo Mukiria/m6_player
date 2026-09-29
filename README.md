@@ -11,7 +11,7 @@ Playback continues in the background with lock-screen and notification controls.
 
 ## Requirements
 
-- Flutter **3.38 or newer**, on the stable channel (CI always builds with the latest stable)
+- Flutter **3.44 or newer**, on the stable channel (CI always builds with the latest stable)
 - Android: JDK 17+
 - iOS: iOS 14.0+
 

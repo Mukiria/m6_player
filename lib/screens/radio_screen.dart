@@ -19,6 +19,7 @@ class _RadioScreenState extends State<RadioScreen> {
   List<RadioStation> _radioStations = [];
   List<RadioStation> _filteredStations = []; // ✅ For searching
   bool _isLoading = true;
+  bool _loadFailed = false; // Network/server error, as opposed to "no stations"
   bool _isPlaying = false;
   String? _currentRadioUrl;
   String _userCountry = "Detecting...";
@@ -42,15 +43,25 @@ class _RadioScreenState extends State<RadioScreen> {
 
   /// ✅ Fetch Radio Stations for the user's country
   Future<void> fetchRadioStations(String countryCode) async {
+    // Already loading on first run (called from initState, where setState isn't allowed)
+    if (!_isLoading) {
+      setState(() {
+        _isLoading = true;
+        _loadFailed = false;
+      });
+    }
     List<RadioStation> stations = [];
+    bool failed = false;
     try {
       stations = await fetchStations(countryCode);
     } catch (e) {
       debugPrint("Error fetching radio stations: $e");
+      failed = true;
     }
     if (!mounted) return;
     setState(() {
       _radioStations = stations;
+      _loadFailed = failed;
       _userCountry = stations.isNotEmpty && stations.first.country.isNotEmpty
           ? stations.first.country
           : countryCode;
@@ -77,14 +88,6 @@ class _RadioScreenState extends State<RadioScreen> {
       } else {
         _audioPlayer.play();
       }
-      return;
-    }
-
-    // iOS and Android both block plain-HTTP streams
-    if (!station.url.startsWith("https")) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Not Available"), backgroundColor: Colors.red),
-      );
       return;
     }
 
@@ -198,6 +201,25 @@ class _RadioScreenState extends State<RadioScreen> {
               Expanded(
                 child: _isLoading
                     ? Center(child: CircularProgressIndicator())
+                    : _loadFailed
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  "Couldn't load radio stations.\nCheck your internet connection.",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.white, fontSize: 18),
+                                ),
+                                SizedBox(height: 16),
+                                ElevatedButton.icon(
+                                  onPressed: () => fetchRadioStations(_deviceCountryCode()),
+                                  icon: Icon(Icons.refresh),
+                                  label: Text("Retry"),
+                                ),
+                              ],
+                            ),
+                          )
                     : _filteredStations.isEmpty
                         ? Center(
                             child: Text(

@@ -33,6 +33,25 @@ void main() {
       expect(stations.map((s) => s.name), ['Good']);
     });
 
+    test('skips plain-HTTP streams', () {
+      final stations = parseStations('''[
+        {"name": "Plain", "url_resolved": "http://example.com/plain"},
+        {"name": "Secure", "url_resolved": "https://example.com/secure"}
+      ]''');
+
+      expect(stations.map((s) => s.name), ['Secure']);
+    });
+
+    test('keeps only the first (most popular) entry per stream URL', () {
+      final stations = parseStations('''[
+        {"name": "Popular", "url_resolved": "https://example.com/same"},
+        {"name": "Other", "url_resolved": "https://example.com/other"},
+        {"name": "Duplicate", "url_resolved": "https://example.com/same"}
+      ]''');
+
+      expect(stations.map((s) => s.name), ['Popular', 'Other']);
+    });
+
     test('handles an empty list', () {
       expect(parseStations('[]'), isEmpty);
     });
