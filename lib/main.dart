@@ -5,7 +5,7 @@ import 'screens/music_player_screen.dart';
 Future<void> main() async {
   // Keeps playback going in the background, with lock-screen/notification controls
   await JustAudioBackground.init(
-    androidNotificationChannelId: 'com.mukiriasixventures.m6player.channel.audio',
+    androidNotificationChannelId: 'com.msixv.com.m6player.channel.audio',
     androidNotificationChannelName: 'Audio playback',
     androidNotificationOngoing: true,
   );
