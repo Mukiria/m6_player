@@ -24,6 +24,7 @@ jobs:
 
       - run: flutter --version
       - run: flutter pub get
+      - run: .github/scripts/check-lockfile.sh
       - run: .github/scripts/run.sh flutter analyze --no-fatal-infos
       - run: .github/scripts/run.sh flutter test
       - run: .github/scripts/run.sh flutter build apk --release
