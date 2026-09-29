@@ -1,0 +1,42 @@
+name: m6player
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.6.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  just_audio: ^0.9.46  # For playing .mp3 files
+  permission_handler: ^11.0.0  # Request storage permissions
+  file_picker: ^6.1.1  # Pick .mp3 files
+  cupertino_icons: ^1.0.8  # Ensures Cupertino-style icons work
+  http: ^1.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true  # ✅ Ensure this is correctly placed
+
+  assets:
+    - assets/logo.png
+    - assets/splash-screen.jpg
+    - assets/splash-screen-radio.jpg
+
+  fonts:
+    - family: Schyler
+      fonts:
+        - asset: assets/fonts/SchuylerScript.ttf
+          style: italic
+          weight: 700
+
+    - family: Code
+      fonts:
+        - asset: assets/fonts/Code.otf
+          weight: 800
