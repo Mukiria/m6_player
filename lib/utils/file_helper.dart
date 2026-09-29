@@ -3,14 +3,14 @@ import 'dart:io';
 
 /// Opens file picker to select an MP3 file and returns the file.
 Future<File?> pickMp3File() async {
-  FilePickerResult? result = await FilePicker.platform.pickFiles(
+  PlatformFile? picked = await FilePicker.pickFile(
     type: FileType.custom,
     allowedExtensions: ['mp3'], // Forces MP3 files only
   );
 
-  if (result != null && result.files.single.path != null) {
-    print("File picked: ${result.files.single.path}");
-    return File(result.files.single.path!);
+  if (picked != null && picked.path != null) {
+    print("File picked: ${picked.path}");
+    return File(picked.path!);
   }
 
   print("No file selected");
