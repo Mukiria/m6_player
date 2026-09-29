@@ -11,7 +11,6 @@ dependencies:
   flutter:
     sdk: flutter
   just_audio: ^0.10.6  # For playing .mp3 files
-  permission_handler: ^13.0.2  # Request storage permissions
   file_picker: ^13.1.0  # Pick .mp3 files
   http: ^1.6.0
 
