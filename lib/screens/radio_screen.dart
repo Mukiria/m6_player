@@ -1,141 +1,116 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:just_audio/just_audio.dart';
+import '../services/player_service.dart';
+import '../services/radio_api.dart';
 
 class RadioScreen extends StatefulWidget {
+  const RadioScreen({super.key});
+
   @override
-  _RadioScreenState createState() => _RadioScreenState();
+  State<RadioScreen> createState() => _RadioScreenState();
 }
 
 class _RadioScreenState extends State<RadioScreen> {
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  List<Map<String, dynamic>> _radioStations = [];
-  List<Map<String, dynamic>> _filteredStations = []; // ✅ For searching
+  final PlayerService _service = PlayerService.instance;
+  AudioPlayer get _audioPlayer => _service.player;
+  StreamSubscription? _playerStateSubscription;
+
+  List<RadioStation> _radioStations = [];
+  List<RadioStation> _filteredStations = []; // ✅ For searching
   bool _isLoading = true;
   bool _isPlaying = false;
   String? _currentRadioUrl;
   String _userCountry = "Detecting...";
-  TextEditingController _searchController = TextEditingController(); // ✅ Search Controller
+  final TextEditingController _searchController = TextEditingController(); // ✅ Search Controller
 
   @override
   void initState() {
     super.initState();
-    fetchUserLocation();
+    _playerStateSubscription = _audioPlayer.playerStateStream.listen((state) {
+      setState(() => _isPlaying = state.playing);
+    });
+    fetchRadioStations(_deviceCountryCode());
     _searchController.addListener(_filterStations); // ✅ Add listener for search
   }
 
-  /// ✅ Detect User's Country via IP
-  Future<void> fetchUserLocation() async {
-    try {
-      final locationResponse = await http.get(Uri.parse("http://ip-api.com/json"));
-      final locationData = json.decode(locationResponse.body);
-      String country = locationData["country"] ?? "USA"; // Default to USA
-
-      setState(() {
-        _userCountry = country;
-      });
-
-      fetchRadioStations(country);
-    } catch (e) {
-      print("Error fetching location: $e");
-      fetchRadioStations("USA");
-    }
+  /// ✅ The user's country from the device's region setting (no network lookup).
+  String _deviceCountryCode() {
+    String? code = WidgetsBinding.instance.platformDispatcher.locale.countryCode;
+    return (code == null || code.isEmpty) ? "US" : code.toUpperCase();
   }
 
-  /// ✅ Fetch Radio Stations for the Detected Country
-  Future<void> fetchRadioStations(String country) async {
+  /// ✅ Fetch Radio Stations for the user's country
+  Future<void> fetchRadioStations(String countryCode) async {
+    List<RadioStation> stations = [];
     try {
-      String encodedCountry = Uri.encodeComponent(country);
-      final response = await http.get(
-        Uri.parse("https://nl1.api.radio-browser.info/json/stations/bycountryexact/$encodedCountry"),
-      );
-
-      if (response.statusCode == 200) {
-        List<dynamic> data = json.decode(response.body);
-        if (data.isNotEmpty) {
-          setState(() {
-            _radioStations = data.map((station) => {
-              "name": station["name"] ?? "Unknown",
-              "url": station["url_resolved"] ?? "",
-            }).toList();
-            _filteredStations = _radioStations; // ✅ Set initial list
-          });
-        } else {
-          setState(() {
-            _radioStations = [];
-            _filteredStations = [];
-          });
-        }
-      } else {
-        setState(() {
-          _radioStations = [];
-          _filteredStations = [];
-        });
-      }
+      stations = await fetchStations(countryCode);
     } catch (e) {
-      print("Error fetching radio stations: $e");
-      setState(() {
-        _radioStations = [];
-        _filteredStations = [];
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      debugPrint("Error fetching radio stations: $e");
     }
+    if (!mounted) return;
+    setState(() {
+      _radioStations = stations;
+      _userCountry = stations.isNotEmpty && stations.first.country.isNotEmpty
+          ? stations.first.country
+          : countryCode;
+      _isLoading = false;
+    });
+    _filterStations();
   }
 
   /// ✅ Search Functionality
   void _filterStations() {
+    String query = _searchController.text.toLowerCase();
     setState(() {
       _filteredStations = _radioStations
-          .where((station) =>
-          station["name"].toLowerCase().contains(_searchController.text.toLowerCase()))
+          .where((station) => station.name.toLowerCase().contains(query))
           .toList();
     });
   }
 
   /// ✅ Play or Pause Radio
-  Future<void> playRadio(String url) async {
-    try {
-      print("🎵 Trying to play: $url");
-
-      if (!url.startsWith("https")) {
-        print("❌ Skipping non-HTTPS stream: $url");
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Not Available"), backgroundColor: Colors.red),
-        );
-        return;
+  Future<void> playRadio(RadioStation station) async {
+    if (_currentRadioUrl == station.url && !_service.isLibraryActive) {
+      if (_isPlaying) {
+        await _audioPlayer.pause();
+      } else {
+        _audioPlayer.play();
       }
+      return;
+    }
 
-      await _audioPlayer.stop();
-      await _audioPlayer.setUrl(url);
-      await _audioPlayer.play();
+    // iOS and Android both block plain-HTTP streams
+    if (!station.url.startsWith("https")) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Not Available"), backgroundColor: Colors.red),
+      );
+      return;
+    }
 
-      setState(() {
-        _currentRadioUrl = url;
-        _isPlaying = true;
-      });
-
-      print("✅ Now Playing: $url");
+    setState(() => _currentRadioUrl = station.url);
+    try {
+      await _service.playStream(station.url, station.name);
     } catch (e) {
-      print("❌ Error playing radio: $e");
+      debugPrint("Error playing radio: $e");
+      if (!mounted) return;
+      setState(() => _currentRadioUrl = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't play ${station.name}"), backgroundColor: Colors.red),
+      );
     }
   }
 
   Future<void> stopRadio() async {
-    await _audioPlayer.stop();
-    setState(() {
-      _isPlaying = false;
-      _currentRadioUrl = null; // ✅ Reset the UI
-    });
-    print("⏹️ Radio stopped.");
+    await _service.stop();
+    if (!mounted) return;
+    setState(() => _currentRadioUrl = null); // ✅ Reset the UI
   }
 
   @override
   void dispose() {
-    _audioPlayer.dispose();
+    // The player is shared and keeps playing in the background; just stop listening.
+    _playerStateSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -186,13 +161,16 @@ class _RadioScreenState extends State<RadioScreen> {
                           height: 60,
                         ),
                         SizedBox(width: 10),
-                        Text(
-                          "Radio ($_userCountry)",
-                          style: TextStyle(
-                            fontFamily: "Schyler",
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                        Expanded(
+                          child: Text(
+                            "Radio ($_userCountry)",
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: "Schyler",
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ],
@@ -217,48 +195,50 @@ class _RadioScreenState extends State<RadioScreen> {
             ],
           ),
 
-          // ✅ Loading & Radio List
-          _isLoading
-              ? Center(child: CircularProgressIndicator())
-              : _filteredStations.isEmpty
-              ? Center(
-            child: Text(
-              "No radio stations found for $_userCountry.",
-              style: TextStyle(color: Colors.white, fontSize: 18),
-            ),
-          )
-              : Positioned(
+          // ✅ Loading & Radio List (kept below the header so search stays visible)
+          Positioned(
             top: 180,
             left: 0,
             right: 0,
             bottom: 100,
-            child: ListView.builder(
-              itemCount: _filteredStations.length,
-              itemBuilder: (context, index) {
-                return ListTile(
-                  title: Text(
-                    _filteredStations[index]["name"],
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          _currentRadioUrl == _filteredStations[index]["url"] && _isPlaying ? Icons.pause : Icons.play_arrow,
-                          color: Colors.white,
+            child: _isLoading
+                ? Center(child: CircularProgressIndicator())
+                : _filteredStations.isEmpty
+                    ? Center(
+                        child: Text(
+                          "No radio stations found for $_userCountry.",
+                          style: TextStyle(color: Colors.white, fontSize: 18),
                         ),
-                        onPressed: () => playRadio(_filteredStations[index]["url"]),
+                      )
+                    : ListView.builder(
+                        itemCount: _filteredStations.length,
+                        itemBuilder: (context, index) {
+                          RadioStation station = _filteredStations[index];
+                          bool isCurrent = _currentRadioUrl == station.url && !_service.isLibraryActive;
+                          return ListTile(
+                            title: Text(
+                              station.name,
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: Icon(
+                                    isCurrent && _isPlaying ? Icons.pause : Icons.play_arrow,
+                                    color: Colors.white,
+                                  ),
+                                  onPressed: () => playRadio(station),
+                                ),
+                                IconButton(
+                                  icon: Icon(Icons.stop, color: Colors.red),
+                                  onPressed: stopRadio, // ✅ Stop button added
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
-                      IconButton(
-                        icon: Icon(Icons.stop, color: Colors.red),
-                        onPressed: stopRadio, // ✅ Stop button added
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
           ),
 
           // ✅ Stop Button

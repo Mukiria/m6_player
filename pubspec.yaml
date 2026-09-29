@@ -11,7 +11,9 @@ dependencies:
   flutter:
     sdk: flutter
   just_audio: ^0.10.6  # For playing .mp3 files
+  just_audio_background: ^0.0.1-beta.17  # Background playback + lock-screen controls
   file_picker: ^13.1.0  # Pick .mp3 files
+  path_provider: ^2.1.6  # App folder for the music library
   http: ^1.6.0
 
 dev_dependencies:

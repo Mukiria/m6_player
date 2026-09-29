@@ -24,16 +24,9 @@ jobs:
 
       - run: flutter --version
       - run: flutter pub get
-      - run: flutter analyze --no-fatal-infos
-      - name: flutter build apk --release
-        run: |
-          set -o pipefail
-          flutter build apk --release 2>&1 | tee build.log || {
-            # Surface the error as an annotation (visible without signing in)
-            msg=$(grep -B2 -A30 -E "What went wrong|Error:|error:|FAILURE|Exception" build.log | head -80 | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')
-            echo "::error title=flutter build apk failed::$msg"
-            exit 1
-          }
+      - run: .github/scripts/run.sh flutter analyze --no-fatal-infos
+      - run: .github/scripts/run.sh flutter test
+      - run: .github/scripts/run.sh flutter build apk --release
 
       - uses: actions/upload-artifact@v5
         with:
@@ -52,4 +45,4 @@ jobs:
 
       - run: flutter --version
       - run: flutter pub get
-      - run: flutter build ios --release --no-codesign
+      - run: .github/scripts/run.sh flutter build ios --release --no-codesign

@@ -1,21 +1,30 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import '../services/player_service.dart';
 import '../utils/file_helper.dart';
+import '../utils/format.dart';
 import 'radio_screen.dart';
 
 class MusicPlayerScreen extends StatefulWidget {
+  const MusicPlayerScreen({super.key});
+
   @override
-  _MusicPlayerScreenState createState() => _MusicPlayerScreenState();
+  State<MusicPlayerScreen> createState() => _MusicPlayerScreenState();
 }
 
 class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final PlayerService _service = PlayerService.instance;
+  AudioPlayer get _audioPlayer => _service.player;
+  final List<StreamSubscription> _subscriptions = [];
+
+  Directory? _libraryDir;
   List<File> _mp3Files = [];
-  File? _currentlyPlayingFile;
+  int? _currentIndex; // Index into _mp3Files of the current track, if any
   bool _isPlaying = false;
   bool _isShuffling = false;
-  bool _isRepeating = false;
+  LoopMode _loopMode = LoopMode.off;
   double _volume = 1.0;
   Duration _currentPosition = Duration.zero;
   Duration _totalDuration = Duration.zero;
@@ -23,51 +32,71 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
   @override
   void initState() {
     super.initState();
-    _audioPlayer.playerStateStream.listen((state) {
-      setState(() => _isPlaying = state.playing);
-    });
+    _isShuffling = _audioPlayer.shuffleModeEnabled;
+    _loopMode = _audioPlayer.loopMode;
+    _volume = _audioPlayer.volume;
 
-    _audioPlayer.positionStream.listen((position) {
-      setState(() => _currentPosition = position);
-    });
-
-    _audioPlayer.durationStream.listen((duration) {
-      if (duration != null) {
-        setState(() => _totalDuration = duration);
-      }
-    });
+    _subscriptions.addAll([
+      _audioPlayer.playerStateStream.listen((state) {
+        setState(() => _isPlaying = state.playing);
+      }),
+      _audioPlayer.positionStream.listen((position) {
+        setState(() => _currentPosition = position);
+      }),
+      _audioPlayer.durationStream.listen((duration) {
+        setState(() => _totalDuration = duration ?? Duration.zero);
+      }),
+      _audioPlayer.currentIndexStream.listen((index) {
+        setState(() => _currentIndex = _service.isLibraryActive ? index : null);
+      }),
+    ]);
+    _loadLibrary();
   }
 
-  Future<void> addMp3File() async {
-    File? file = await pickMp3File();
-    if (file != null) {
-      setState(() => _mp3Files.add(file));
+  Future<void> _loadLibrary() async {
+    try {
+      Directory dir = await libraryDirectory();
+      List<File> files = await loadLibrary(dir);
+      if (!mounted) return;
+      setState(() {
+        _libraryDir = dir;
+        _mp3Files = files;
+      });
+    } catch (e) {
+      debugPrint("Error loading library: $e");
     }
   }
 
-  Future<void> togglePlayPause(File file) async {
+  Future<void> addMp3File() async {
+    File? picked = await pickMp3File();
+    if (picked == null || _libraryDir == null) return;
     try {
-      if (_currentlyPlayingFile == file && _isPlaying) {
+      File file = await importToLibrary(picked, _libraryDir!);
+      await _service.addTrack(file);
+      if (!mounted) return;
+      setState(() => _mp3Files.add(file));
+    } catch (e) {
+      debugPrint("Error adding file: $e");
+    }
+  }
+
+  /// Play/pause button on a track in the list.
+  Future<void> togglePlayPause(int index) async {
+    try {
+      if (_currentIndex == index && _isPlaying) {
         await _audioPlayer.pause();
+      } else if (_currentIndex == index) {
+        _audioPlayer.play();
       } else {
-        if (_currentlyPlayingFile != null) await _audioPlayer.stop();
-        await _audioPlayer.setFilePath(file.path);
-        await _audioPlayer.play();
-        setState(() => _currentlyPlayingFile = file);
+        await _service.playLibrary(_mp3Files, index);
       }
     } catch (e) {
-      print("Error playing file: $e");
+      debugPrint("Error playing file: $e");
     }
   }
 
   void seekTo(Duration position) {
     _audioPlayer.seek(position);
-  }
-
-  String formatDuration(Duration duration) {
-    String minutes = duration.inMinutes.toString().padLeft(2, '0');
-    String seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-    return "$minutes:$seconds";
   }
 
   void _changeVolume(double delta) {
@@ -79,64 +108,67 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
 
   void _toggleShuffle() {
     setState(() => _isShuffling = !_isShuffling);
+    _audioPlayer.setShuffleModeEnabled(_isShuffling);
   }
 
-  void _togglePlayPause() async {
+  /// Main play/pause button. Starts the library if nothing is loaded yet.
+  Future<void> _togglePlayPause() async {
     if (_isPlaying) {
       await _audioPlayer.pause();
-    } else {
-      await _audioPlayer.play();
+    } else if (_currentIndex == null && _mp3Files.isNotEmpty) {
+      await togglePlayPause(0);
+    } else if (_audioPlayer.audioSources.isNotEmpty) {
+      _audioPlayer.play();
     }
-    setState(() {
-      _isPlaying = !_isPlaying;
-    });
   }
 
+  /// Cycles repeat: off -> all -> one -> off.
   void _toggleRepeat() {
-    setState(() => _isRepeating = !_isRepeating);
+    const modes = [LoopMode.off, LoopMode.all, LoopMode.one];
+    setState(() => _loopMode = modes[(modes.indexOf(_loopMode) + 1) % modes.length]);
+    _audioPlayer.setLoopMode(_loopMode);
   }
 
-  void deleteMp3File(File file) {
-    deleteFile(file.path);
+  Future<void> deleteMp3File(int index) async {
+    File file = _mp3Files[index];
+    bool confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text("Remove song?"),
+            content: Text(
+                "Remove \"${trackTitle(file)}\" from m6 player? The original file on your device is not affected."),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: Text("Cancel")),
+              TextButton(onPressed: () => Navigator.pop(context, true), child: Text("Remove")),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !mounted) return;
+
+    await _service.removeTrack(index);
+    await removeFromLibrary(file);
+    if (!mounted) return;
     setState(() {
-      _mp3Files.remove(file);
-    });
-
-    if (_currentlyPlayingFile == file) {
-      stopPlayback();
-    }
-  }
-
-  Future<void> stopPlayback() async {
-    await _audioPlayer.stop();
-    setState(() {
-      _isPlaying = false;
+      _mp3Files.removeAt(index);
+      if (_mp3Files.isEmpty) _currentIndex = null;
     });
   }
 
-  // ✅ Fixed Previous Song Function
   Future<void> playPreviousSong() async {
-    if (_mp3Files.isEmpty || _currentlyPlayingFile == null) return;
-
-    int currentIndex = _mp3Files.indexOf(_currentlyPlayingFile!);
-    if (currentIndex > 0) {
-      togglePlayPause(_mp3Files[currentIndex - 1]);
-    }
+    if (_service.isLibraryActive) await _audioPlayer.seekToPrevious();
   }
 
-  // ✅ Fixed Next Song Function
   Future<void> playNextSong() async {
-    if (_mp3Files.isEmpty || _currentlyPlayingFile == null) return;
-
-    int currentIndex = _mp3Files.indexOf(_currentlyPlayingFile!);
-    if (currentIndex < _mp3Files.length - 1) {
-      togglePlayPause(_mp3Files[currentIndex + 1]);
-    }
+    if (_service.isLibraryActive) await _audioPlayer.seekToNext();
   }
 
   @override
   void dispose() {
-    _audioPlayer.dispose();
+    // The player is shared and keeps playing in the background; just stop listening.
+    for (final subscription in _subscriptions) {
+      subscription.cancel();
+    }
     super.dispose();
   }
 
@@ -198,7 +230,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
                 SizedBox(width: 20),
                 FloatingActionButton.extended(
                   onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => RadioScreen()));
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const RadioScreen()));
                   },
                   backgroundColor: Colors.black,
                   icon: Icon(Icons.radio, color: Colors.white),
@@ -225,22 +257,22 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
               itemBuilder: (context, index) {
                 File file = _mp3Files[index];
                 return ListTile(
-                  title: Text(file.path.split('/').last, style: TextStyle(color: Colors.white)),
+                  title: Text(trackTitle(file), style: TextStyle(color: Colors.white)),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
                         icon: Icon(
-                          (_currentlyPlayingFile == file && _isPlaying)
+                          (_currentIndex == index && _isPlaying)
                               ? Icons.pause
                               : Icons.play_arrow,
                           color: Colors.white,
                         ),
-                        onPressed: () => togglePlayPause(file),
+                        onPressed: () => togglePlayPause(index),
                       ),
                       IconButton(
                         icon: Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => deleteMp3File(file),
+                        onPressed: () => deleteMp3File(index),
                       ),
                     ],
                   ),
@@ -256,7 +288,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
               margin: EdgeInsets.only(bottom: 10),
               width: MediaQuery.of(context).size.width * 0.9,
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.8),
+                color: Colors.black.withValues(alpha: 0.8),
                 borderRadius: BorderRadius.circular(15),
               ),
               padding: EdgeInsets.all(10),
@@ -267,7 +299,10 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
                   Column(
                     children: [
                       Slider(
-                        value: _currentPosition.inSeconds.toDouble(),
+                        // Position can briefly exceed duration at the end of a track
+                        value: _currentPosition.inSeconds
+                            .clamp(0, _totalDuration.inSeconds)
+                            .toDouble(),
                         min: 0,
                         max: _totalDuration.inSeconds.toDouble(),
                         onChanged: (value) => seekTo(Duration(seconds: value.toInt())),
@@ -328,9 +363,16 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
                       ),
                       IconButton(
                         icon: Icon(Icons.skip_next, color: Colors.white, size: 30),
-                        onPressed: () => playNextSong,
+                        onPressed: playNextSong,
                       ),
-                      IconButton(icon: Icon(Icons.repeat, color: Colors.white), onPressed: _toggleRepeat),
+                      IconButton(
+                        icon: Icon(
+                          _loopMode == LoopMode.one ? Icons.repeat_one : Icons.repeat,
+                          color: _loopMode == LoopMode.off ? Colors.white : Colors.orange,
+                          size: 30,
+                        ),
+                        onPressed: _toggleRepeat,
+                      ),
                     ],
                   ),
                   IconButton(
