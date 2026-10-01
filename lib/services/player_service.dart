@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_background/just_audio_background.dart';
+import 'package:just_audio_background/just_audio_background.dart' show MediaItem; // (it also has a TrackInfo class)
 import 'track_info.dart';
 
 /// The one audio player shared by the music and radio screens, so only one
