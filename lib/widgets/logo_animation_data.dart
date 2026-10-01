@@ -11,6 +11,15 @@ const List<double> logoWaveTransform = [190.0, 119.9, 1.1714];
 const List<double> logoWaveGradientX = [160.0, 540.0];
 const double logoWaveStrokeWidth = 8.0;
 
+/// When each part animates, from the SVGs' CSS: [delay s, duration s, then the
+/// cubic-bezier's x1, y1, x2, y2], or null when that part doesn't animate.
+/// The cable draws itself; earbuds pop (scale from 0); words rise and fade in.
+const List<double>? logoCableDraw = null;
+const List<double>? logoBudLeftPop = null;
+const List<double>? logoBudRightPop = null;
+const List<double>? logoWordARise = null;
+const List<double>? logoWordBRise = null;
+
 /// One wave loop, in seconds; the keyframes are evenly spaced over it.
 const double logoWaveSeconds = 2.4;
 

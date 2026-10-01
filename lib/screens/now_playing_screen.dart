@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_background/just_audio_background.dart';
+import 'package:audio_service/audio_service.dart' show MediaItem;
 import '../services/library_store.dart';
 import '../services/player_service.dart';
 import '../theme.dart';
@@ -230,7 +230,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                         IconButton(
                           tooltip: "Add to playlist",
                           icon: Icon(Icons.playlist_add, color: Colors.white),
-                          onPressed: () => showAddToPlaylist(context, _currentSong!),
+                          onPressed: () => showAddTo(context, key: songKey(_currentSong!), kind: MediaKind.audio),
                         ),
                       ],
                       TextButton.icon(

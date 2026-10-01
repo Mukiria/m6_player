@@ -5,9 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:video_player/video_player.dart';
 import '../services/player_service.dart';
+import '../services/video_library.dart';
 import '../theme.dart';
 import '../utils/format.dart';
-import 'video_screen.dart';
+import '../widgets/video_list.dart';
 
 /// Full-screen video player. Tap to show or hide the controls; double-tap the
 /// left or right side to go back or forward 10 seconds. Plays the next video
@@ -33,12 +34,29 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Timer? _hideTimer;
   Duration? _dragPosition; // While the user drags the seek bar
 
-  AssetEntity get _video => widget.videos[_index];
+  /// The video showing: from the list at [_index], or one from the up-next queue.
+  late AssetEntity _video;
+
+  /// True when there's a video to go to after this one (up next, or later in the list).
+  bool get _hasNext => VideoLibrary.instance.upNext.isNotEmpty || _index < widget.videos.length - 1;
+
+  /// Next video: the up-next queue (Play next / Play last) comes first, then the list.
+  void _goNext() {
+    AssetEntity? queued = VideoLibrary.instance.takeUpNext();
+    if (queued != null) {
+      _video = queued;
+    } else {
+      _index++;
+      _video = widget.videos[_index];
+    }
+    _open();
+  }
 
   @override
   void initState() {
     super.initState();
     _index = widget.index;
+    _video = widget.videos[_index];
     // Music and video shouldn't play over each other.
     PlayerService.instance.player.pause();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -79,10 +97,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (controller == null || !mounted) return;
     VideoPlayerValue value = controller.value;
     bool ended = value.isInitialized && !value.isPlaying && value.position >= value.duration && value.duration > Duration.zero;
-    if (ended && !_advancing && _index < widget.videos.length - 1) {
+    if (ended && !_advancing && _hasNext) {
       _advancing = true;
-      _index++;
-      _open().whenComplete(() => _advancing = false);
+      _goNext();
+      Future.delayed(Duration(milliseconds: 500), () => _advancing = false);
       return;
     }
     PlayerService.instance.videoPlaying.value = value.isPlaying;
@@ -218,6 +236,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   onPressed: _index > 0
                       ? () {
                           _index--;
+                          _video = widget.videos[_index];
                           _open();
                         }
                       : null,
@@ -237,12 +256,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   tooltip: "Next video",
                   iconSize: 36,
                   icon: Icon(Icons.skip_next, color: Colors.white),
-                  onPressed: _index < widget.videos.length - 1
-                      ? () {
-                          _index++;
-                          _open();
-                        }
-                      : null,
+                  onPressed: _hasNext ? _goNext : null,
                 ),
               ],
             ),

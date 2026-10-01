@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:just_audio_background/just_audio_background.dart';
+import 'package:audio_service/audio_service.dart';
 import 'screens/home_screen.dart';
+import 'services/audio_handler.dart';
+import 'services/player_service.dart';
 import 'theme.dart';
 
 Future<void> main() async {
-  // Keeps playback going in the background, with lock-screen/notification controls
-  await JustAudioBackground.init(
-    androidNotificationChannelId: 'com.msixv.com.m6player.channel.audio',
-    androidNotificationChannelName: 'Audio playback',
-    androidNotificationOngoing: true,
-    androidNotificationIcon: 'drawable/ic_stat_m6', // White music note (the colour app icon shows as a blank square)
-    notificationColor: brandBlue,
+  // Keeps playback going in the background, with notification, lock-screen and
+  // headset controls (see M6AudioHandler for the notification's buttons).
+  await AudioService.init(
+    builder: () => M6AudioHandler(PlayerService.instance),
+    config: AudioServiceConfig(
+      androidNotificationChannelId: 'com.msixv.com.m6player.channel.audio',
+      androidNotificationChannelName: 'Audio playback',
+      androidNotificationOngoing: true,
+      androidNotificationIcon: 'drawable/ic_stat_m6', // White music note (the colour app icon shows as a blank square)
+      notificationColor: brandBlue,
+    ),
   );
   runApp(const MyApp());
 }

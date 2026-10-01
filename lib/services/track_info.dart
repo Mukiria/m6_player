@@ -12,8 +12,9 @@ class TrackInfo {
   final String? artist;
   final String? album;
   final String? coverPath;
+  final Duration? duration; // From the file's audio frames, when readable
 
-  const TrackInfo({required this.title, this.artist, this.album, this.coverPath});
+  const TrackInfo({required this.title, this.artist, this.album, this.coverPath, this.duration});
 
   /// Artist (and album when known) for the line under the title.
   String get subtitle => songSubtitle(artist, album);
@@ -89,6 +90,7 @@ TrackInfo readTrackInfo(File file, String coverDir) {
       artist: _clean(tags.artist) ?? _clean(tags.albumArtist),
       album: _clean(tags.album),
       coverPath: coverPath,
+      duration: tags.duration,
     );
   } catch (_) {
     return TrackInfo(title: fallbackTitle, coverPath: existingCover);

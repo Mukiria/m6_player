@@ -84,6 +84,60 @@ void main() {
     expect(store.playlists, isEmpty);
   });
 
+  test('Latest keeps the newest addition first, without duplicates', () async {
+    LibraryStore store = await LibraryStore.open(storeFile);
+    await store.addToLatest('a.mp3');
+    await store.addToLatest('b.mp3');
+    await store.addToLatest('a.mp3'); // Moves back to the top
+
+    expect(store.latest, ['a.mp3', 'b.mp3']);
+    await store.removeFromLatest('a.mp3');
+    expect(store.latest, ['b.mp3']);
+  });
+
+  test('hidden and filtered-out items are saved and can be brought back', () async {
+    LibraryStore store = await LibraryStore.open(storeFile);
+    await store.hide('a.mp3');
+    await store.filterOut(videoKey('42'));
+
+    LibraryStore reopened = await LibraryStore.open(storeFile);
+    expect(reopened.isHidden('a.mp3'), isTrue);
+    expect(reopened.isFilteredOut(videoKey('42')), isTrue);
+
+    await reopened.unhide('a.mp3');
+    await reopened.restoreFilteredOut(videoKey('42'));
+    expect(reopened.hidden, isEmpty);
+    expect(reopened.filteredOut, isEmpty);
+  });
+
+  test('video playlists are kept apart from song playlists', () async {
+    LibraryStore store = await LibraryStore.open(storeFile);
+    await store.createPlaylist('Songs');
+    await store.createPlaylist('Clips', kind: MediaKind.video);
+
+    LibraryStore reopened = await LibraryStore.open(storeFile);
+    expect(reopened.playlistsOf(MediaKind.audio).map((p) => p.name).toList(), ['Songs']);
+    expect(reopened.playlistsOf(MediaKind.video).map((p) => p.name).toList(), ['Clips']);
+  });
+
+  test('a deleted item also leaves Latest, hidden and filtered', () async {
+    LibraryStore store = await LibraryStore.open(storeFile);
+    await store.addToLatest('gone.mp3');
+    await store.hide('gone.mp3');
+    await store.filterOut('gone.mp3');
+
+    await store.forgetSong('gone.mp3');
+
+    expect(store.latest, isEmpty);
+    expect(store.isHidden('gone.mp3'), isFalse);
+    expect(store.isFilteredOut('gone.mp3'), isFalse);
+  });
+
+  test('video keys round-trip to their phone id', () {
+    expect(videoIdOf(videoKey('1234')), '1234');
+    expect(videoIdOf('song.mp3'), isNull);
+  });
+
   group('sortSongs', () {
     // Oldest first, as the library loads them.
     List<File> songs = [File('/m/c.mp3'), File('/m/a.mp3'), File('/m/b.mp3'), File('/m/d.mp3')];

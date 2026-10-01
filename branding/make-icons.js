@@ -81,6 +81,25 @@ for (const img of contents.images) {
   write(path.join(iosDir, img.filename), render(square, px, { opaque: true }));
 }
 
+// Notification button with the m6 mark (left of "previous"), from the white app icon.
+// Android draws notification buttons in one colour from the icon's shape, so the
+// white background square is dropped (it would become a solid block), every part
+// is made white, the wave is thickened to stay visible at 24dp, and the artwork
+// is cropped to its shapes.
+let mark = read('m6-player-app-icon-white-square.svg')
+  .replace(/\s*<rect width="1024" height="1024"[^>]*\/>/, '')
+  .replace(/(stroke|fill)="(?!none)[^"]*"/g, '$1="#ffffff"')
+  .replace(/stroke-width="8"/, 'stroke-width="22"')
+  .replace(/opacity="[\d.]+"/g, '');
+const markBox = new Resvg(mark).innerBBox();
+const side = Math.max(markBox.width, markBox.height) * 1.08;
+mark = mark.replace(/viewBox="[^"]*" width="1024" height="1024"/,
+  `viewBox="${markBox.x + markBox.width / 2 - side / 2} ${markBox.y + markBox.height / 2 - side / 2} ${side} ${side}" width="${side}" height="${side}"`);
+for (const [dpi, k] of Object.entries(android)) {
+  write(path.join(APP, `android/app/src/main/res/drawable-${dpi}/ic_notification_logo.png`), render(mark, 24 * k));
+}
+write(path.join(PREVIEW, 'notification-logo.png'), render(mark, 96));
+
 // Play Store listing icon (512 x 512, no alpha) and previews.
 write(path.join(APP, 'branding/play-store-icon-512.png'), render(square, 512, { opaque: true }));
 write(path.join(PREVIEW, 'icon.png'), render(square, 300));

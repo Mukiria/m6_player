@@ -9,8 +9,8 @@ import 'logo_animation_data.dart';
 
 /// The m6 player logo, in its light or dark version to match the theme.
 /// While music, radio or a video is playing it animates like the animated
-/// logo SVGs (earbuds pop in, the cable draws itself and keeps waving, the
-/// name rises in); when playback stops it goes back to the still logo.
+/// logo SVGs in branding/ (currently: the cable waves; other parts stay
+/// still); when playback stops it goes back to the still logo.
 class AppLogo extends StatefulWidget {
   final double height;
 
@@ -87,22 +87,22 @@ class _AppLogoState extends State<AppLogo> with SingleTickerProviderStateMixin {
   }
 }
 
-/// One frame of the animation, [seconds] after it started. Timings follow the
-/// animated SVGs' CSS: earbuds pop at 0 s and 1.75 s, the cable draws from
-/// 0.3 s over 1.52 s, "m6" and "player" rise at 2.05 s and 2.2 s.
+/// One frame of the animation, [seconds] after it started. Timings come from
+/// the animated SVGs' CSS (see logo_animation_data.dart); a part without one
+/// stays still.
 class _AnimatedLogo extends StatelessWidget {
   final LogoTheme theme;
   final double seconds, width, height;
 
   const _AnimatedLogo({required this.theme, required this.seconds, required this.width, required this.height});
 
-  static const Cubic _pop = Cubic(0.3, 1.6, 0.5, 1);
-  static const Cubic _draw = Cubic(0.45, 0, 0.35, 1);
-  static const Cubic _rise = Cubic(0.2, 0.8, 0.2, 1);
-
-  /// Progress 0..1 of a step starting at [delay] and lasting [duration], eased by [curve].
-  double _progress(double delay, double duration, Curve curve) =>
-      curve.transform(((seconds - delay) / duration).clamp(0.0, 1.0));
+  /// Progress 0..1 of a step timed as [delay, duration, cubic-bezier x1, y1, x2, y2];
+  /// 1 (finished) for a part that doesn't animate.
+  double _progress(List<double>? timing) {
+    if (timing == null) return 1;
+    Cubic curve = Cubic(timing[2], timing[3], timing[4], timing[5]);
+    return curve.transform(((seconds - timing[0]) / timing[1]).clamp(0.0, 1.0));
+  }
 
   /// A point in the logo's (root SVG) coordinates, as a fraction of the widget.
   Alignment _align(double x, double y) => Alignment(
@@ -113,18 +113,20 @@ class _AnimatedLogo extends StatelessWidget {
   Widget _part(String svg) => SvgPicture.string(svg, width: width, height: height);
 
   /// An earbud scaling up from where it meets the cable.
-  Widget _bud(String svg, double cableEndX, double delay) {
+  Widget _bud(String svg, double cableEndX, List<double>? timing) {
+    if (timing == null) return _part(svg);
     double s = logoWaveTransform[2];
     return Transform.scale(
-      scale: _progress(delay, 0.45, _pop),
+      scale: _progress(timing),
       alignment: _align(logoWaveTransform[0] + cableEndX * s, logoWaveTransform[1] + 120 * s),
       child: _part(svg),
     );
   }
 
   /// A word fading in while rising 24 units.
-  Widget _word(String svg, double delay) {
-    double p = _progress(delay, 0.7, _rise);
+  Widget _word(String svg, List<double>? timing) {
+    if (timing == null) return _part(svg);
+    double p = _progress(timing);
     return Opacity(
       opacity: p,
       child: Transform.translate(offset: Offset(0, (1 - p) * 24 * height / logoViewBox[3]), child: _part(svg)),
@@ -137,12 +139,12 @@ class _AnimatedLogo extends StatelessWidget {
       children: [
         CustomPaint(
           size: Size(width, height),
-          painter: _WavePainter(theme: theme, seconds: seconds, reveal: _progress(0.3, 1.52, _draw)),
+          painter: _WavePainter(theme: theme, seconds: seconds, reveal: _progress(logoCableDraw)),
         ),
-        _bud(theme.budLeft, 162, 0), // The left earbud's group is mirrored, so its cable end is at x 162
-        _bud(theme.budRight, 538, 1.75),
-        _word(theme.wordA, 2.05),
-        _word(theme.wordB, 2.2),
+        _bud(theme.budLeft, 162, logoBudLeftPop), // The left earbud's group is mirrored, so its cable end is at x 162
+        _bud(theme.budRight, 538, logoBudRightPop),
+        _word(theme.wordA, logoWordARise),
+        _word(theme.wordB, logoWordBRise),
       ],
     );
   }

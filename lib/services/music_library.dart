@@ -65,6 +65,30 @@ class MusicLibrary extends ChangeNotifier {
     return (added, skipped);
   }
 
+  /// Where a song received from another phone should be saved: in the library
+  /// folder, numbered if the name is taken.
+  Future<File> receivedSongTarget(String name) async {
+    Directory dir = _dir ?? await libraryDirectory();
+    _dir = dir;
+    int dot = name.lastIndexOf('.');
+    String base = dot > 0 ? name.substring(0, dot) : name;
+    String ext = dot > 0 ? name.substring(dot) : '.mp3';
+    File target = File('${dir.path}/$base$ext');
+    for (int n = 1; target.existsSync(); n++) {
+      target = File('${dir.path}/$base ($n)$ext');
+    }
+    return target;
+  }
+
+  /// A song received from another phone was saved into the library folder.
+  Future<void> addReceived(File file) async {
+    if (_songs.any((song) => song.path == file.path)) return;
+    _songs.add(file);
+    await _player.addTrack(file);
+    await _tracks.load([file]);
+    notifyListeners();
+  }
+
   /// Deletes the app's copy of [file], and takes it out of the player,
   /// favourites and playlists.
   Future<void> delete(File file) async {

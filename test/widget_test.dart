@@ -7,6 +7,7 @@ import 'package:m6player/services/player_service.dart';
 import 'package:m6player/theme.dart';
 import 'package:m6player/widgets/app_logo.dart';
 import 'package:m6player/widgets/logo_animation_data.dart';
+import 'package:m6player/widgets/options_sheet.dart';
 
 /// Screen tests run without a phone, so the audio plugins get fake channels
 /// that answer every call with nothing. The music library and radio list then
@@ -120,5 +121,33 @@ void main() {
       expect(frame, hasLength(logoWaveX.length));
     }
     expect(logoWaveY.first, logoWaveY.last); // The loop ends where it starts
+  });
+
+  testWidgets('the options sheet shows its title and buttons, and a tap closes it and runs the button', (tester) async {
+    String? tapped;
+    await tester.pumpWidget(MaterialApp(
+      theme: lightTheme(),
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showOptionsSheet(context, title: 'Malaika', options: [
+              SheetOption(icon: Icons.playlist_play, label: 'Play next', onTap: () => tapped = 'next'),
+              SheetOption(icon: Icons.delete_outline, label: 'Delete', destructive: true, onTap: () => tapped = 'delete'),
+            ]),
+            child: Text('open'),
+          ),
+        ),
+      ),
+    ));
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    expect(find.text('Malaika'), findsOneWidget);
+    expect(find.byIcon(Icons.playlist_play), findsOneWidget);
+
+    await tester.tap(find.text('Play next'));
+    await tester.pumpAndSettle();
+    expect(tapped, 'next');
+    expect(find.text('Malaika'), findsNothing); // Closed
   });
 }

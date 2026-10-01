@@ -7,13 +7,17 @@ import '../services/track_info.dart';
 import '../utils/file_helper.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/artwork.dart';
+import '../widgets/item_actions.dart';
 import '../widgets/playlist_picker.dart';
 import '../widgets/song_list.dart';
 import '../widgets/tab_background.dart';
+import 'hidden_screen.dart';
 import 'playlist_screen.dart';
+import 'transfer_screen.dart';
 
-/// The Music tab: Songs, Favourites and Playlists, with sorting and adding
-/// music. The playback controls live in the mini player and Now Playing.
+/// The Music tab: Songs, Favourites, Latest and Playlists, with sorting and
+/// adding music. Hidden songs are left out of every list, filtered-out ones out
+/// of Songs. The playback controls live in the mini player and Now Playing.
 class MusicPlayerScreen extends StatefulWidget {
   const MusicPlayerScreen({super.key});
 
@@ -50,10 +54,24 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
 
   SortOrder get _sort => _store?.sort ?? SortOrder.dateAdded;
 
-  List<File> get _sortedSongs => sortSongs(_library.songs, _sort, TrackInfoService.instance.infoFor);
+  bool _isHidden(File song) => _store?.isHidden(songKey(song)) ?? false;
+
+  /// Every song that isn't hidden, in the chosen order (filtered-out ones included).
+  List<File> get _visibleSongs =>
+      sortSongs(_library.songs, _sort, TrackInfoService.instance.infoFor).where((s) => !_isHidden(s)).toList();
+
+  /// The Songs list: visible songs minus the filtered-out ones.
+  List<File> get _sortedSongs => _visibleSongs.where((s) => !(_store?.isFilteredOut(songKey(s)) ?? false)).toList();
 
   List<File> get _favourites =>
-      _sortedSongs.where((song) => _store?.isFavourite(songKey(song)) ?? false).toList();
+      _visibleSongs.where((song) => _store?.isFavourite(songKey(song)) ?? false).toList();
+
+  /// Latest, newest addition first.
+  List<File> get _latest => (_store?.latest ?? [])
+      .map(_library.songNamed)
+      .whereType<File>()
+      .where((song) => !_isHidden(song))
+      .toList();
 
   Future<void> _setSort(SortOrder sort) async {
     await _store?.setSort(sort);
@@ -151,7 +169,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
     return TabBackground(
       image: 'assets/backgrounds/music.jpg',
       child: DefaultTabController(
-        length: 3,
+        length: 4,
         child: Scaffold(
           backgroundColor: Colors.transparent,
           appBar: AppBar(
@@ -173,6 +191,16 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
                 icon: Icon(Icons.add),
                 onPressed: _isImporting ? null : _showAddOptions,
               ),
+              PopupMenuButton<String>(
+                tooltip: "More",
+                onSelected: (action) => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (context) => action == "hidden" ? const HiddenScreen() : const TransferScreen(),
+                )),
+                itemBuilder: (context) => [
+                  PopupMenuItem(value: "hidden", child: Text("Hidden & filtered")),
+                  if (Platform.isAndroid) PopupMenuItem(value: "receive", child: Text("Receive files")),
+                ],
+              ),
             ],
             bottom: PreferredSize(
               preferredSize: Size.fromHeight(50),
@@ -184,7 +212,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
                     dividerColor: Colors.transparent,
                     labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                     unselectedLabelStyle: TextStyle(fontSize: 16),
-                    tabs: [Tab(text: "Songs"), Tab(text: "Favourites"), Tab(text: "Playlists")],
+                    tabs: [Tab(text: "Songs"), Tab(text: "Favourites"), Tab(text: "Latest"), Tab(text: "Playlists")],
                   ),
                   SizedBox(height: 2, child: _isImporting ? LinearProgressIndicator(minHeight: 2) : null),
                 ],
@@ -195,6 +223,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
             children: [
               _songsTab(colors),
               _favouritesTab(colors),
+              _latestTab(colors),
               _playlistsTab(colors),
             ],
           ),
@@ -238,12 +267,31 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
     return SongList(
       songs: favourites,
       queueId: PlayerService.favouritesQueue,
+      from: ItemList.favourites,
       header: "Favourites (${favourites.length})",
     );
   }
 
+  Widget _latestTab(ColorScheme colors) {
+    List<File> latest = _latest;
+    if (latest.isEmpty) {
+      return _message(
+        colors,
+        icon: Icons.fiber_new_outlined,
+        title: "Nothing in Latest yet",
+        text: "Use a song's ⋮ menu, Add to…, Latest.",
+      );
+    }
+    return SongList(
+      songs: latest,
+      queueId: PlayerService.latestQueue,
+      from: ItemList.latest,
+      header: "Latest (${latest.length})",
+    );
+  }
+
   Widget _playlistsTab(ColorScheme colors) {
-    List<Playlist> playlists = _store?.playlists ?? [];
+    List<Playlist> playlists = _store?.playlistsOf(MediaKind.audio) ?? [];
     return ListView(
       padding: EdgeInsets.only(bottom: 8),
       children: [

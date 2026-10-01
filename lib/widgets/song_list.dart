@@ -2,28 +2,30 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../services/library_store.dart';
-import '../services/music_library.dart';
 import '../services/player_service.dart';
 import '../services/track_info.dart';
 import 'artwork.dart';
-import 'playlist_picker.dart';
+import 'item_actions.dart';
 
-/// A list of songs: all songs, favourites or one playlist. Tapping a song plays
-/// this list from that song ([queueId] names the list for the player); tapping
-/// the playing song pauses or resumes it. Each song's ⋮ menu has Play,
-/// favourites, Add to playlist, Remove from this playlist (for a playlist) and
-/// Delete from m6 player.
+/// A list of songs: all songs, favourites, Latest or one playlist. Tapping a
+/// song plays this list from that song ([queueId] names the list for the
+/// player); tapping the playing song pauses or resumes it. Each song's ⋮
+/// opens its options sheet (see item_actions.dart).
 class SongList extends StatefulWidget {
   final List<File> songs;
   final String queueId;
 
-  /// Set when this list is a playlist, to offer "Remove from this playlist".
+  /// Which list this is, for the options sheet's "Filter out".
+  final ItemList from;
+
+  /// Set when this list is a playlist.
   final String? playlistId;
 
   /// Line above the list, such as "Songs (12)".
   final String? header;
 
-  const SongList({super.key, required this.songs, required this.queueId, this.playlistId, this.header});
+  const SongList(
+      {super.key, required this.songs, required this.queueId, this.from = ItemList.all, this.playlistId, this.header});
 
   @override
   State<SongList> createState() => _SongListState();
@@ -69,7 +71,7 @@ class _SongListState extends State<SongList> {
   Future<void> _togglePlay(int index) async {
     File song = widget.songs[index];
     try {
-      if (_currentPath == song.path && _service.queueId == widget.queueId) {
+      if (_currentPath == song.path) {
         _isPlaying ? await _service.player.pause() : await _service.resume();
       } else {
         await _service.playQueue(widget.queueId, widget.songs, index);
@@ -77,29 +79,6 @@ class _SongListState extends State<SongList> {
     } catch (e) {
       debugPrint("Error playing file: $e");
     }
-  }
-
-  Future<void> _delete(File song) async {
-    bool confirmed = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text("Delete song?"),
-            content: Text("Delete \"${_tracks.infoFor(song).title}\" from m6 player? "
-                "It's also removed from your favourites and playlists. The original file on your device is not affected."),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: Text("Cancel")),
-              TextButton(onPressed: () => Navigator.pop(context, true), child: Text("Delete")),
-            ],
-          ),
-        ) ??
-        false;
-    if (confirmed) await MusicLibrary.instance.delete(song);
-  }
-
-  /// Takes the song off this playlist. If the playlist is playing, it keeps
-  /// playing as it was; the change applies the next time it's started.
-  Future<void> _removeFromPlaylist(File song) async {
-    await _store?.removeFromPlaylist(widget.playlistId!, songKey(song));
   }
 
   @override
@@ -163,33 +142,10 @@ class _SongListState extends State<SongList> {
         ],
       ),
       onTap: () => _togglePlay(index),
-      trailing: PopupMenuButton<String>(
+      trailing: IconButton(
         tooltip: "More",
         icon: Icon(Icons.more_vert),
-        onSelected: (action) {
-          switch (action) {
-            case "play":
-              _togglePlay(index);
-            case "favourite":
-              _store?.toggleFavourite(songKey(song));
-            case "playlist":
-              showAddToPlaylist(context, song);
-            case "unlist":
-              _removeFromPlaylist(song);
-            case "delete":
-              _delete(song);
-          }
-        },
-        itemBuilder: (context) => [
-          PopupMenuItem(value: "play", child: Text(isCurrent && _isPlaying ? "Pause" : "Play")),
-          PopupMenuItem(
-            value: "favourite",
-            child: Text(isFavourite ? "Remove from favourites" : "Add to favourites"),
-          ),
-          PopupMenuItem(value: "playlist", child: Text("Add to playlist…")),
-          if (widget.playlistId != null) PopupMenuItem(value: "unlist", child: Text("Remove from this playlist")),
-          PopupMenuItem(value: "delete", child: Text("Delete from m6 player")),
-        ],
+        onPressed: () => showSongOptions(context, song, from: widget.from, playlistId: widget.playlistId),
       ),
     );
   }

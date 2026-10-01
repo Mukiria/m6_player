@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_background/just_audio_background.dart' show MediaItem; // (it also has a TrackInfo class)
+import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'track_info.dart';
 
 /// The one audio player shared by the music and radio screens, so only one
@@ -37,6 +37,7 @@ class PlayerService {
 
   static const String allSongsQueue = 'songs';
   static const String favouritesQueue = 'favourites';
+  static const String latestQueue = 'latest';
 
   /// Path of the song playing now, or null when nothing (or the radio) is.
   String? get currentSongPath => isLibraryActive ? currentItem?.id : null;
@@ -58,6 +59,34 @@ class PlayerService {
     _askForNotifications();
     // Not awaited: play() only completes once playback pauses or stops.
     player.play();
+  }
+
+  /// Play next: puts [file] right after the current song. If no songs are
+  /// playing, it starts playing on its own.
+  Future<void> playNext(File file) => _enqueue(file, next: true);
+
+  /// Play last: puts [file] at the end of what's playing. If no songs are
+  /// playing, it starts playing on its own.
+  Future<void> playLast(File file) => _enqueue(file, next: false);
+
+  Future<void> _enqueue(File file, {required bool next}) async {
+    if (!isLibraryActive || _queuePaths.isEmpty) {
+      await playQueue('single:${file.path}', [file], 0);
+      return;
+    }
+    await TrackInfoService.instance.load([file]);
+    // Inserting a song already in the list would duplicate it; move it instead.
+    int existing = _queuePaths.indexOf(file.path);
+    if (existing >= 0 && existing != player.currentIndex) {
+      _queuePaths.removeAt(existing);
+      await player.removeAudioSourceAt(existing);
+    }
+    int at = next ? (player.currentIndex ?? -1) + 1 : _queuePaths.length;
+    at = at.clamp(0, _queuePaths.length);
+    _queuePaths.insert(at, file.path);
+    await player.insertAudioSource(at, _trackSource(file));
+    // The playing list no longer matches the one on screen.
+    queueId = '${queueId ?? 'custom'}+';
   }
 
   /// A new song joined the library: add it to the end of the playlist too if

@@ -1,6 +1,6 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../services/library_store.dart';
+import 'options_sheet.dart';
 
 /// Asks for a playlist name. Null if cancelled or left blank.
 Future<String?> askPlaylistName(BuildContext context, {String title = "New playlist", String initial = ""}) async {
@@ -27,45 +27,59 @@ Future<String?> askPlaylistName(BuildContext context, {String title = "New playl
   return (name == null || name.isEmpty) ? null : name;
 }
 
-/// "Add to playlist" sheet: pick a playlist for [song], or make a new one.
-Future<void> showAddToPlaylist(BuildContext context, File song) async {
+/// "Add to" sheet: Favourites, Latest, one of the playlists for this kind of
+/// item, or a new playlist. [key] is the item's songKey() or videoKey().
+Future<void> showAddTo(BuildContext context, {required String key, required MediaKind kind}) async {
   LibraryStore store = await LibraryStore.instance();
   if (!context.mounted) return;
-  String? playlistId = await showModalBottomSheet<String>(
-    context: context,
-    builder: (context) => SafeArea(
-      child: ListView(
-        shrinkWrap: true,
-        children: [
-          ListTile(
-            title: Text("Add to playlist", style: TextStyle(fontWeight: FontWeight.w600)),
-          ),
-          ListTile(
-            leading: Icon(Icons.add),
-            title: Text("New playlist"),
-            onTap: () => Navigator.pop(context, ''),
-          ),
-          for (Playlist playlist in store.playlists)
-            ListTile(
-              leading: Icon(Icons.queue_music),
-              title: Text(playlist.name),
-              subtitle: Text("${playlist.songs.length} ${playlist.songs.length == 1 ? "song" : "songs"}"),
-              onTap: () => Navigator.pop(context, playlist.id),
-            ),
-        ],
+  ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+  void done(String message) => messenger.showSnackBar(SnackBar(content: Text(message)));
+
+  await showOptionsSheet(
+    context,
+    title: "Add to",
+    options: [
+      SheetOption(
+        icon: store.isFavourite(key) ? Icons.favorite : Icons.favorite_border,
+        label: "Favourites",
+        onTap: () async {
+          if (store.isFavourite(key)) {
+            done("Already in Favourites");
+            return;
+          }
+          await store.toggleFavourite(key);
+          done("Added to Favourites");
+        },
       ),
-    ),
+      SheetOption(
+        icon: Icons.fiber_new_outlined,
+        label: "Latest",
+        onTap: () async {
+          await store.addToLatest(key);
+          done("Added to Latest");
+        },
+      ),
+      for (Playlist playlist in store.playlistsOf(kind))
+        SheetOption(
+          icon: Icons.queue_music,
+          label: playlist.name,
+          onTap: () async {
+            bool added = await store.addToPlaylist(playlist.id, key);
+            done(added ? "Added to ${playlist.name}" : "Already in ${playlist.name}");
+          },
+        ),
+      SheetOption(
+        icon: Icons.playlist_add,
+        label: "New playlist…",
+        onTap: () async {
+          if (!context.mounted) return;
+          String? name = await askPlaylistName(context);
+          if (name == null) return;
+          Playlist playlist = await store.createPlaylist(name, kind: kind);
+          await store.addToPlaylist(playlist.id, key);
+          done("Added to ${playlist.name}");
+        },
+      ),
+    ],
   );
-  if (playlistId == null || !context.mounted) return;
-  if (playlistId.isEmpty) {
-    String? name = await askPlaylistName(context);
-    if (name == null) return;
-    playlistId = (await store.createPlaylist(name)).id;
-  }
-  bool added = await store.addToPlaylist(playlistId, songKey(song));
-  if (!context.mounted) return;
-  String name = store.playlist(playlistId)?.name ?? "the playlist";
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-    content: Text(added ? "Added to $name" : "Already in $name"),
-  ));
 }
