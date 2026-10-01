@@ -11,7 +11,7 @@
 | | |
 |---|---|
 | App ID | `com.msixv.com.m6player` (fixed, do not change) |
-| Theme | Brand blue from the logo: accent `#3B82F6` (`#2563EB` on light, `#60A5FA` on dark), navy `#0B1533` for dark mode. Changed from orange `#F1552C` on 2026-10-01 to match the new logo |
+| Theme | Brand blue from the logo: accent `#3B82F6` (`#2563EB` on light, `#60A5FA` on dark), navy `#0B1533` for dark mode. Changed from orange `#F1552C` on 2026-10-01 to match the new logo; the bottom nav bar stays brand orange `#F1552C` (white icons) in both themes |
 | Logos | Source SVGs in `branding/` (from `M6ix/m6 player/`); `node branding/make-icons.js` regenerates `assets/branding/logo-{light,dark}.svg` and all app icons |
 | Repo | https://github.com/Mukiria/m6_player (branch `master`) |
 | Platforms | Android, iOS 14.0+ |
