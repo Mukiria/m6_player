@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import '../services/player_service.dart';
 import '../services/radio_api.dart';
+import '../widgets/app_logo.dart';
+import '../widgets/artwork.dart';
 
+/// The Radio tab: popular stations for the phone's country, with search.
 class RadioScreen extends StatefulWidget {
   const RadioScreen({super.key});
 
@@ -104,12 +107,6 @@ class _RadioScreenState extends State<RadioScreen> {
     }
   }
 
-  Future<void> stopRadio() async {
-    await _service.stop();
-    if (!mounted) return;
-    setState(() => _currentRadioUrl = null); // ✅ Reset the UI
-  }
-
   @override
   void dispose() {
     // The player is shared and keeps playing in the background; just stop listening.
@@ -120,167 +117,83 @@ class _RadioScreenState extends State<RadioScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ColorScheme colors = Theme.of(context).colorScheme;
     return Scaffold(
-      extendBodyBehindAppBar: true,
-
-      body: Stack(
+      appBar: AppBar(
+        title: AppLogo(),
+        centerTitle: false,
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ✅ Background Image
-          Container(
-            decoration: BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage("assets/splash-screen-radio.jpg"),
-                fit: BoxFit.cover,
-              ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: SearchBar(
+              controller: _searchController,
+              hintText: "Search stations",
+              leading: Icon(Icons.search),
+              elevation: WidgetStatePropertyAll(0),
+              backgroundColor: WidgetStatePropertyAll(colors.surfaceContainerHighest),
             ),
           ),
-
-          // ✅ Top Bar with Search Box
-          Column(
-            children: [
-              Container(
-                width: double.infinity,
-                // Extended up behind the status bar
-                padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 20, 20, 20),
-                decoration: BoxDecoration(
-                  color: Color(0xFFA20CA2),
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(20),
-                    bottomRight: Radius.circular(20),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: Icon(Icons.arrow_back, color: Colors.white),
-                          onPressed: () {
-                            Navigator.pop(context);
-                          },
-                        ),
-                        SizedBox(width: 10),
-                        Image.asset(
-                          "assets/logo.png",
-                          height: 60,
-                        ),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            "Radio ($_userCountry)",
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontFamily: "Schyler",
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+          if (!_isLoading && !_loadFailed)
+            Padding(
+              padding: EdgeInsets.fromLTRB(16, 4, 16, 4),
+              child: Text("Stations in $_userCountry (${_filteredStations.length})",
+                  style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant)),
+            ),
+          Expanded(
+            child: _isLoading
+                ? Center(child: CircularProgressIndicator())
+                : _loadFailed
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.wifi_off, size: 48, color: colors.onSurfaceVariant),
+                            SizedBox(height: 12),
+                            Text(
+                              "Couldn't load radio stations.\nCheck your internet connection.",
+                              textAlign: TextAlign.center,
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 10),
-                    // ✅ Search Bar
-                    TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: "Search for a station...",
-                        filled: true,
-                        fillColor: Colors.white,
-                        prefixIcon: Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // ✅ Loading & Radio List
-              Expanded(
-                child: _isLoading
-                    ? Center(child: CircularProgressIndicator())
-                    : _loadFailed
-                        ? Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  "Couldn't load radio stations.\nCheck your internet connection.",
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.white, fontSize: 18),
-                                ),
-                                SizedBox(height: 16),
-                                ElevatedButton.icon(
-                                  onPressed: () => fetchRadioStations(_deviceCountryCode()),
-                                  icon: Icon(Icons.refresh),
-                                  label: Text("Retry"),
-                                ),
-                              ],
+                            SizedBox(height: 16),
+                            FilledButton.icon(
+                              onPressed: () => fetchRadioStations(_deviceCountryCode()),
+                              icon: Icon(Icons.refresh),
+                              label: Text("Retry"),
                             ),
-                          )
+                          ],
+                        ),
+                      )
                     : _filteredStations.isEmpty
-                        ? Center(
-                            child: Text(
-                              "No radio stations found for $_userCountry.",
-                              style: TextStyle(color: Colors.white, fontSize: 18),
-                            ),
-                          )
+                        ? Center(child: Text("No radio stations found for $_userCountry."))
                         : ListView.builder(
-                            padding: EdgeInsets.zero,
                             itemCount: _filteredStations.length,
-                            itemBuilder: (context, index) {
-                              RadioStation station = _filteredStations[index];
-                              bool isCurrent = _currentRadioUrl == station.url && !_service.isLibraryActive;
-                              return ListTile(
-                                title: Text(
-                                  station.name,
-                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: Icon(
-                                        isCurrent && _isPlaying ? Icons.pause : Icons.play_arrow,
-                                        color: Colors.white,
-                                      ),
-                                      onPressed: () => playRadio(station),
-                                    ),
-                                    IconButton(
-                                      icon: Icon(Icons.stop, color: Colors.red),
-                                      onPressed: stopRadio, // ✅ Stop button added
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
+                            itemBuilder: (context, index) => _stationTile(_filteredStations[index], colors),
                           ),
-              ),
-
-              // ✅ Stop Button, extended down behind the navigation bar
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 0),
-                  child: Container(
-                    width: MediaQuery.of(context).size.width * 1,
-                    padding: EdgeInsets.fromLTRB(20, 10, 20, MediaQuery.of(context).padding.bottom + 10),
-                    decoration: BoxDecoration(
-                      color: Color(0xFFA20CA2),
-                    ),
-                    child: IconButton(
-                      icon: Icon(Icons.stop, color: Colors.white, size: 30),
-                      onPressed: stopRadio,
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _stationTile(RadioStation station, ColorScheme colors) {
+    bool isCurrent = _currentRadioUrl == station.url && !_service.isLibraryActive;
+    return ListTile(
+      leading: Artwork(size: 40, isRadio: true, round: true),
+      title: Text(
+        station.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: isCurrent ? colors.primary : null,
+          fontWeight: isCurrent ? FontWeight.w600 : null,
+        ),
+      ),
+      trailing: isCurrent
+          ? Icon(_isPlaying ? Icons.graphic_eq : Icons.pause, color: colors.primary)
+          : null,
+      onTap: () => playRadio(station),
     );
   }
 }

@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import '../services/player_service.dart';
 import '../utils/file_helper.dart';
-import '../utils/format.dart';
-import 'radio_screen.dart';
+import '../widgets/app_logo.dart';
 
+/// The Music tab: the user's song library. Tap a song to play it; the playback
+/// controls live in the mini player and the Now Playing screen.
 class MusicPlayerScreen extends StatefulWidget {
   const MusicPlayerScreen({super.key});
 
@@ -23,28 +24,13 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
   List<File> _mp3Files = [];
   int? _currentIndex; // Index into _mp3Files of the current track, if any
   bool _isPlaying = false;
-  bool _isShuffling = false;
-  LoopMode _loopMode = LoopMode.off;
-  double _volume = 1.0;
-  Duration _currentPosition = Duration.zero;
-  Duration _totalDuration = Duration.zero;
 
   @override
   void initState() {
     super.initState();
-    _isShuffling = _audioPlayer.shuffleModeEnabled;
-    _loopMode = _audioPlayer.loopMode;
-    _volume = _audioPlayer.volume;
-
     _subscriptions.addAll([
       _audioPlayer.playerStateStream.listen((state) {
         setState(() => _isPlaying = state.playing);
-      }),
-      _audioPlayer.positionStream.listen((position) {
-        setState(() => _currentPosition = position);
-      }),
-      _audioPlayer.durationStream.listen((duration) {
-        setState(() => _totalDuration = duration ?? Duration.zero);
       }),
       _audioPlayer.currentIndexStream.listen((index) {
         setState(() => _currentIndex = _service.isLibraryActive ? index : null);
@@ -67,66 +53,116 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
     }
   }
 
-  Future<void> addMp3File() async {
-    File? picked = await pickMp3File();
-    if (picked == null || _libraryDir == null) return;
+  bool _isImporting = false;
+
+  /// "Add" button: choose songs, or a whole folder.
+  void _showAddOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.audio_file_outlined),
+              title: Text("Choose songs"),
+              subtitle: Text("Pick one or more MP3s"),
+              onTap: () {
+                Navigator.pop(context);
+                _addSongs();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.folder_outlined),
+              title: Text("Add a folder"),
+              subtitle: Text("Adds every MP3 in it, including subfolders"),
+              onTap: () {
+                Navigator.pop(context);
+                _addFolder();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addSongs() async {
     try {
-      File file = await importToLibrary(picked, _libraryDir!);
-      await _service.addTrack(file);
-      if (!mounted) return;
-      setState(() => _mp3Files.add(file));
+      await _import(await pickMp3Files());
     } catch (e) {
-      debugPrint("Error adding file: $e");
+      debugPrint("Error picking files: $e");
     }
   }
 
-  /// Play/pause button on a track in the list.
+  Future<void> _addFolder() async {
+    try {
+      Directory? folder = await pickFolder();
+      if (folder == null) return;
+      if (!await requestAudioPermission()) {
+        _showMessage("m6 player needs permission to read your music to add a folder.");
+        return;
+      }
+      List<File> songs = await findMp3s(folder);
+      if (songs.isEmpty) {
+        _showMessage("No MP3s found in that folder.");
+        return;
+      }
+      await _import(songs);
+    } catch (e) {
+      debugPrint("Error adding folder: $e");
+      _showMessage("Couldn't read that folder. Try choosing the songs instead.");
+    }
+  }
+
+  /// Copies [picked] songs into the library (skipping ones already there) and
+  /// adds them to the end of the playlist.
+  Future<void> _import(List<File> picked) async {
+    if (picked.isEmpty || _libraryDir == null) return;
+    setState(() => _isImporting = true);
+    int added = 0, skipped = 0;
+    for (File source in picked) {
+      try {
+        if (isInLibrary(source, _mp3Files)) {
+          skipped++;
+          continue;
+        }
+        File file = await importToLibrary(source, _libraryDir!);
+        await _service.addTrack(file);
+        if (!mounted) return;
+        setState(() => _mp3Files.add(file));
+        added++;
+      } catch (e) {
+        debugPrint("Error adding ${source.path}: $e");
+      }
+    }
+    if (!mounted) return;
+    setState(() => _isImporting = false);
+    if (picked.length > 1 || skipped > 0) {
+      String message = "Added $added ${added == 1 ? "song" : "songs"}";
+      if (skipped > 0) message += " ($skipped already in your library)";
+      _showMessage(message);
+    }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// Tapping a song plays it; tapping the current song pauses or resumes it.
   Future<void> togglePlayPause(int index) async {
     try {
       if (_currentIndex == index && _isPlaying) {
         await _audioPlayer.pause();
       } else if (_currentIndex == index) {
-        _audioPlayer.play();
+        await _service.resume();
       } else {
         await _service.playLibrary(_mp3Files, index);
       }
     } catch (e) {
       debugPrint("Error playing file: $e");
     }
-  }
-
-  void seekTo(Duration position) {
-    _audioPlayer.seek(position);
-  }
-
-  void _changeVolume(double delta) {
-    setState(() {
-      _volume = (_volume + delta).clamp(0.0, 1.0);
-      _audioPlayer.setVolume(_volume);
-    });
-  }
-
-  void _toggleShuffle() {
-    setState(() => _isShuffling = !_isShuffling);
-    _audioPlayer.setShuffleModeEnabled(_isShuffling);
-  }
-
-  /// Main play/pause button. Starts the library if nothing is loaded yet.
-  Future<void> _togglePlayPause() async {
-    if (_isPlaying) {
-      await _audioPlayer.pause();
-    } else if (_currentIndex == null && _mp3Files.isNotEmpty) {
-      await togglePlayPause(0);
-    } else if (_audioPlayer.audioSources.isNotEmpty) {
-      _audioPlayer.play();
-    }
-  }
-
-  /// Cycles repeat: off -> all -> one -> off.
-  void _toggleRepeat() {
-    const modes = [LoopMode.off, LoopMode.all, LoopMode.one];
-    setState(() => _loopMode = modes[(modes.indexOf(_loopMode) + 1) % modes.length]);
-    _audioPlayer.setLoopMode(_loopMode);
   }
 
   Future<void> deleteMp3File(int index) async {
@@ -155,14 +191,6 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
     });
   }
 
-  Future<void> playPreviousSong() async {
-    if (_service.isLibraryActive) await _audioPlayer.seekToPrevious();
-  }
-
-  Future<void> playNextSong() async {
-    if (_service.isLibraryActive) await _audioPlayer.seekToNext();
-  }
-
   @override
   void dispose() {
     // The player is shared and keeps playing in the background; just stop listening.
@@ -174,216 +202,105 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ColorScheme colors = Theme.of(context).colorScheme;
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      body: Stack(
-        children: [
-          // ✅ Background Image
-          Container(
-            decoration: BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage("assets/splash-screen.jpg"),
-                fit: BoxFit.cover,
+      appBar: AppBar(
+        title: AppLogo(),
+        centerTitle: false,
+        actions: [
+          IconButton(
+            tooltip: "Add songs",
+            icon: Icon(Icons.add),
+            onPressed: _isImporting ? null : _showAddOptions,
+          ),
+        ],
+        bottom: _isImporting
+            ? PreferredSize(preferredSize: Size.fromHeight(2), child: LinearProgressIndicator(minHeight: 2))
+            : null,
+      ),
+      body: _mp3Files.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.library_music_outlined, size: 64, color: colors.onSurfaceVariant),
+                  SizedBox(height: 16),
+                  Text("No songs yet", style: TextStyle(fontSize: 18)),
+                  SizedBox(height: 4),
+                  Text("Add MP3s or a music folder from your phone.",
+                      style: TextStyle(color: colors.onSurfaceVariant)),
+                  SizedBox(height: 20),
+                  FilledButton.icon(
+                    onPressed: _isImporting ? null : _showAddOptions,
+                    icon: Icon(Icons.add),
+                    label: Text("Add songs"),
+                  ),
+                ],
               ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: Text("Songs (${_mp3Files.length})",
+                      style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant)),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _mp3Files.length,
+                    itemBuilder: (context, index) => _songTile(index, colors),
+                  ),
+                ),
+              ],
             ),
+    );
+  }
+
+  Widget _songTile(int index, ColorScheme colors) {
+    File file = _mp3Files[index];
+    bool isCurrent = _currentIndex == index;
+    return ListTile(
+      contentPadding: EdgeInsets.only(left: 16, right: 4),
+      leading: isCurrent
+          ? Icon(_isPlaying ? Icons.graphic_eq : Icons.pause, color: colors.primary)
+          : null,
+      minLeadingWidth: 24,
+      title: Text(
+        trackTitle(file),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: isCurrent ? colors.primary : null,
+          fontWeight: isCurrent ? FontWeight.w600 : null,
+        ),
+      ),
+      subtitle: Text(_fileSize(file), style: TextStyle(color: colors.onSurfaceVariant)),
+      onTap: () => togglePlayPause(index),
+      trailing: PopupMenuButton<String>(
+        tooltip: "More",
+        icon: Icon(Icons.more_vert),
+        onSelected: (action) {
+          if (action == "play") togglePlayPause(index);
+          if (action == "remove") deleteMp3File(index);
+        },
+        itemBuilder: (context) => [
+          PopupMenuItem(
+            value: "play",
+            child: Text(isCurrent && _isPlaying ? "Pause" : "Play"),
           ),
-
-          Column(
-            children: [
-              // ✅ Top Bar (Logo & Title), extended up behind the status bar
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 20, 20, 20),
-                decoration: BoxDecoration(
-                  color: Color(0xFFF1552C),
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(20),
-                    bottomRight: Radius.circular(20),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Image.asset("assets/logo.png", height: 60),
-                    SizedBox(width: 10),
-                    Text("m6 player",
-                        style: TextStyle(
-                            fontFamily: "Code",
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white)),
-                  ],
-                ),
-              ),
-
-              // ✅ Floating Buttons (Add Song & Radio)
-              Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    FloatingActionButton(
-                      onPressed: addMp3File,
-                      backgroundColor: Colors.black,
-                      child: Icon(Icons.add, color: Colors.white),
-                    ),
-                    SizedBox(width: 20),
-                    FloatingActionButton.extended(
-                      onPressed: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context) => const RadioScreen()));
-                      },
-                      backgroundColor: Colors.black,
-                      icon: Icon(Icons.radio, color: Colors.white),
-                      label: Text("Radio", style: TextStyle(color: Colors.white)),
-                    ),
-                  ],
-                ),
-              ),
-
-              Expanded(
-                child: _mp3Files.isEmpty
-                    ? Center(
-                  child: Text(
-                    "No MP3 files found. Tap + to add.",
-                    style: TextStyle(fontSize: 18, color: Colors.white),
-                  ),
-                )
-                    : ListView.builder(
-                  padding: EdgeInsets.zero,
-                  itemCount: _mp3Files.length,
-                  itemBuilder: (context, index) {
-                    File file = _mp3Files[index];
-                    return ListTile(
-                      title: Text(trackTitle(file), style: TextStyle(color: Colors.white)),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              (_currentIndex == index && _isPlaying)
-                                  ? Icons.pause
-                                  : Icons.play_arrow,
-                              color: Colors.white,
-                            ),
-                            onPressed: () => togglePlayPause(index),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.delete, color: Colors.red),
-                            onPressed: () => deleteMp3File(index),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-              // ✅ Bottom Bar with Seek Bar
-              SafeArea(
-                top: false,
-                child: Container(
-                  margin: EdgeInsets.only(top: 10, bottom: 10),
-                  width: MediaQuery.of(context).size.width * 0.9,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.8),
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  padding: EdgeInsets.all(10),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // ✅ Seek Bar
-                      Column(
-                        children: [
-                          Slider(
-                            // Position can briefly exceed duration at the end of a track
-                            value: _currentPosition.inSeconds
-                                .clamp(0, _totalDuration.inSeconds)
-                                .toDouble(),
-                            min: 0,
-                            max: _totalDuration.inSeconds.toDouble(),
-                            onChanged: (value) => seekTo(Duration(seconds: value.toInt())),
-                            activeColor: Colors.white,
-                            inactiveColor: Colors.grey,
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                formatDuration(_currentPosition),
-                                style: TextStyle(color: Colors.white),
-                              ),
-                              Text(
-                                formatDuration(_totalDuration),
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-
-                      // ✅ Volume Up Button (Above Play/Pause)
-                      IconButton(
-                        icon: Icon(Icons.volume_up, color: Colors.white, size: 30),
-                        onPressed: () => _changeVolume(0.1),
-                      ),
-
-                      // ✅ Bottom Control Row
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              Icons.shuffle,
-                              color: _isShuffling ? Colors.orange : Colors.white,
-                              size: 30,
-                            ),
-                            onPressed: _toggleShuffle,
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.skip_previous, color: Colors.white, size: 30),
-                            onPressed: playPreviousSong,
-                          ),
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white,
-                            ),
-                            child: IconButton(
-                              icon: Icon(
-                                _isPlaying ? Icons.pause : Icons.play_arrow,
-                                color: Colors.black,
-                                size: 40,
-                              ),
-                              onPressed: _togglePlayPause,
-                            ),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.skip_next, color: Colors.white, size: 30),
-                            onPressed: playNextSong,
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              _loopMode == LoopMode.one ? Icons.repeat_one : Icons.repeat,
-                              color: _loopMode == LoopMode.off ? Colors.white : Colors.orange,
-                              size: 30,
-                            ),
-                            onPressed: _toggleRepeat,
-                          ),
-                        ],
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.volume_down, color: Colors.white, size: 30),
-                        onPressed: () => _changeVolume(-0.1),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+          PopupMenuItem(value: "remove", child: Text("Remove")),
         ],
       ),
     );
+  }
+
+  /// File size such as "4.2 MB", shown under the song title.
+  String _fileSize(File file) {
+    try {
+      return "${(file.lengthSync() / (1024 * 1024)).toStringAsFixed(1)} MB";
+    } catch (_) {
+      return "";
+    }
   }
 }

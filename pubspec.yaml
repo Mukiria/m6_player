@@ -12,9 +12,13 @@ dependencies:
     sdk: flutter
   just_audio: ^0.10.6  # For playing .mp3 files
   just_audio_background: ^0.0.1-beta.17  # Background playback + lock-screen controls
-  file_picker: ^13.1.0  # Pick .mp3 files
+  file_picker: ^13.1.0  # Pick .mp3 files and folders
   path_provider: ^2.1.6  # App folder for the music library
   http: ^1.6.0
+  permission_handler: ^13.0.2  # Reading a picked music folder on Android
+  flutter_svg: ^2.3.0  # The m6 player logo (light and dark versions)
+  photo_manager: ^3.12.0  # Lists the phone's videos, with thumbnails
+  video_player: ^2.10.0  # Plays them
 
 dev_dependencies:
   flutter_test:
@@ -25,18 +29,4 @@ flutter:
   uses-material-design: true  # ✅ Ensure this is correctly placed
 
   assets:
-    - assets/logo.png
-    - assets/splash-screen.jpg
-    - assets/splash-screen-radio.jpg
-
-  fonts:
-    - family: Schyler
-      fonts:
-        - asset: assets/fonts/SchuylerScript.ttf
-          style: italic
-          weight: 700
-
-    - family: Code
-      fonts:
-        - asset: assets/fonts/Code.otf
-          weight: 800
+    - assets/branding/

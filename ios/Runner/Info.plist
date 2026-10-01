@@ -49,5 +49,7 @@
 	</array>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>m6 player shows the videos in your library so you can play them.</string>
 </dict>
 </plist>

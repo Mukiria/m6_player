@@ -1,18 +1,49 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
 
-/// Opens file picker to select an MP3 file and returns the file.
-Future<File?> pickMp3File() async {
-  PlatformFile? picked = await FilePicker.pickFile(
+/// Opens the file picker to select one or more MP3s. Empty if cancelled.
+Future<List<File>> pickMp3Files() async {
+  List<PlatformFile> picked = await FilePicker.pickFiles(
     type: FileType.custom,
     allowedExtensions: ['mp3'], // Forces MP3 files only
   );
+  return picked.where((file) => file.path != null).map((file) => File(file.path!)).toList();
+}
 
-  if (picked != null && picked.path != null) {
-    return File(picked.path!);
-  }
-  return null;
+/// Lets the user choose a folder. Null if cancelled.
+Future<Directory?> pickFolder() async {
+  String? path = await FilePicker.getDirectoryPath(dialogTitle: 'Choose a music folder');
+  return path == null ? null : Directory(path);
+}
+
+/// Asks for permission to read the phone's audio files, needed to look inside
+/// a folder the user picked (Android only; iOS grants access through the picker).
+Future<bool> requestAudioPermission() async {
+  if (!Platform.isAndroid) return true;
+  // Android 13+ uses the audio permission, older versions the storage one.
+  Map<Permission, PermissionStatus> statuses = await [Permission.audio, Permission.storage].request();
+  return statuses.values.any((status) => status.isGranted || status.isLimited);
+}
+
+/// All MP3s in [dir] and its subfolders, sorted by path (so albums stay in order).
+Future<List<File>> findMp3s(Directory dir) async {
+  List<File> files = await dir
+      .list(recursive: true, followLinks: false)
+      .where((entity) => entity is File && entity.path.toLowerCase().endsWith('.mp3'))
+      .cast<File>()
+      .toList();
+  files.sort((a, b) => a.path.toLowerCase().compareTo(b.path.toLowerCase()));
+  return files;
+}
+
+/// True if [library] already has a copy of [source]: same file name and size.
+/// Stops a folder that is added twice from duplicating every song.
+bool isInLibrary(File source, List<File> library) {
+  String name = source.uri.pathSegments.last;
+  int size = source.lengthSync();
+  return library.any((file) => file.uri.pathSegments.last == name && file.lengthSync() == size);
 }
 
 /// The app's own music library folder. Picked songs are copied here so the

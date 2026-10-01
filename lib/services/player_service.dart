@@ -49,9 +49,50 @@ class PlayerService {
 
   Future<void> stop() => player.stop();
 
+  /// Play button. After the last song has finished, starts again from the first.
+  Future<void> resume() async {
+    if (player.processingState == ProcessingState.completed && isLibraryActive) {
+      await player.seek(Duration.zero, index: player.effectiveIndices.first);
+    }
+    player.play();
+  }
+
+  /// Next button. After the last song it wraps round to the first (in shuffle
+  /// order when shuffle is on), and a finished playlist starts playing again.
+  Future<void> next() async {
+    if (!isLibraryActive || player.sequence.isEmpty) return;
+    bool finished = player.processingState == ProcessingState.completed;
+    if (player.hasNext) {
+      await player.seekToNext();
+    } else {
+      await player.seek(Duration.zero, index: player.effectiveIndices.first);
+    }
+    if (finished) player.play();
+  }
+
+  /// Previous button: restarts the song if it's more than 3 seconds in,
+  /// otherwise goes to the previous song (from the first, wraps to the last).
+  Future<void> previous() async {
+    if (!isLibraryActive || player.sequence.isEmpty) return;
+    if (player.position > Duration(seconds: 3) || player.sequence.length == 1) {
+      await player.seek(Duration.zero);
+    } else if (player.hasPrevious) {
+      await player.seekToPrevious();
+    } else {
+      await player.seek(Duration.zero, index: player.effectiveIndices.last);
+    }
+  }
+
+  /// What is playing now (a song or a station), for the mini player and the
+  /// Now Playing screen. Null when nothing has been loaded yet.
+  Stream<MediaItem?> get currentItemStream =>
+      player.sequenceStateStream.map((state) => state.currentSource?.tag as MediaItem?);
+
+  MediaItem? get currentItem => player.sequenceState.currentSource?.tag as MediaItem?;
+
   AudioSource _trackSource(File file) => AudioSource.file(
         file.path,
-        tag: MediaItem(id: file.path, title: trackTitle(file)),
+        tag: MediaItem(id: file.path, title: trackTitle(file), album: 'My music'),
       );
 }
 

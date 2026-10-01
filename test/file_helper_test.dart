@@ -48,6 +48,29 @@ void main() {
     expect(files.map((f) => f.path), [b.path, a.path]);
   });
 
+  test('findMp3s finds MP3s in subfolders, sorted by path', () async {
+    final folder = await Directory('${temp.path}/picked/Album').create(recursive: true);
+    File('${temp.path}/picked/b.mp3').writeAsStringSync('b');
+    File('${folder.path}/a.MP3').writeAsStringSync('a');
+    File('${folder.path}/cover.jpg').writeAsStringSync('jpg');
+
+    final files = await findMp3s(Directory('${temp.path}/picked'));
+
+    expect(files.map((f) => f.path), ['${folder.path}/a.MP3', '${temp.path}/picked/b.mp3']);
+  });
+
+  test('isInLibrary matches on file name and size', () async {
+    final original = source('song.mp3');
+    final copy = await importToLibrary(original, library);
+    final sameNameDifferentSong = File('${temp.path}/other/song.mp3')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('a different, longer song');
+
+    expect(isInLibrary(original, [copy]), isTrue);
+    expect(isInLibrary(sameNameDifferentSong, [copy]), isFalse);
+    expect(isInLibrary(original, []), isFalse);
+  });
+
   test('removeFromLibrary deletes only the library copy', () async {
     final original = source('song.mp3');
     final copy = await importToLibrary(original, library);

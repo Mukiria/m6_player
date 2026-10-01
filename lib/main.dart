@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio_background/just_audio_background.dart';
-import 'screens/music_player_screen.dart';
+import 'screens/home_screen.dart';
+import 'theme.dart';
 
 Future<void> main() async {
   // Keeps playback going in the background, with lock-screen/notification controls
@@ -19,10 +20,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'm6 player',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Color(0xFFF1552C)),
-      ),
-      home: const MusicPlayerScreen(),
+      // Light or dark, following the phone's setting
+      theme: lightTheme(),
+      darkTheme: darkTheme(),
+      themeMode: ThemeMode.system,
+      home: const HomeScreen(),
     );
   }
 }
