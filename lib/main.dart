@@ -9,6 +9,8 @@ Future<void> main() async {
     androidNotificationChannelId: 'com.msixv.com.m6player.channel.audio',
     androidNotificationChannelName: 'Audio playback',
     androidNotificationOngoing: true,
+    androidNotificationIcon: 'drawable/ic_stat_m6', // White music note (the colour app icon shows as a blank square)
+    notificationColor: brandBlue,
   );
   runApp(const MyApp());
 }

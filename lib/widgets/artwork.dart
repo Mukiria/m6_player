@@ -1,23 +1,46 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../theme.dart';
 
-/// Placeholder cover art in the brand colours: a music note for songs, a radio
-/// for stations. (Reading real cover art from the MP3s can replace this later.)
+/// A song's cover art, or a placeholder in the brand colours when it has none:
+/// a music note for songs, a radio for stations.
 class Artwork extends StatelessWidget {
   final double size;
   final bool isRadio;
   final bool round;
 
-  const Artwork({super.key, required this.size, this.isRadio = false, this.round = false});
+  /// Cover image saved from the song's tags, if any.
+  final String? coverPath;
+
+  const Artwork({super.key, required this.size, this.isRadio = false, this.round = false, this.coverPath});
 
   @override
   Widget build(BuildContext context) {
+    BorderRadius? radius = round ? null : BorderRadius.circular(size * 0.08);
+    String? cover = coverPath;
+    if (cover != null) {
+      int pixels = (size * MediaQuery.devicePixelRatioOf(context)).round();
+      Widget image = Image.file(
+        File(cover),
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        cacheWidth: pixels, // Decode at display size, not the full (often huge) cover
+        gaplessPlayback: true,
+        errorBuilder: (context, error, stack) => _placeholder(radius),
+      );
+      return round ? ClipOval(child: image) : ClipRRect(borderRadius: radius!, child: image);
+    }
+    return _placeholder(radius);
+  }
+
+  Widget _placeholder(BorderRadius? radius) {
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         shape: round ? BoxShape.circle : BoxShape.rectangle,
-        borderRadius: round ? null : BorderRadius.circular(size * 0.08),
+        borderRadius: radius,
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,

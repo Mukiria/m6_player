@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import '../services/library_store.dart';
 import '../services/player_service.dart';
 import '../theme.dart';
 import '../utils/format.dart';
 import '../widgets/artwork.dart';
+import '../widgets/playlist_picker.dart';
 
 /// Full-screen player: artwork, seek bar and all the playback controls.
 /// Always dark, whatever the phone's theme, so the artwork stands out.
@@ -28,6 +31,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   Duration? _dragPosition; // While the user drags the seek bar
+  LibraryStore? _store;
+  Timer? _clock; // Redraws the sleep timer's minutes left
 
   @override
   void initState() {
@@ -48,6 +53,18 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
       _audioPlayer.shuffleModeEnabledStream.listen((enabled) => setState(() => _isShuffling = enabled)),
       _audioPlayer.loopModeStream.listen((mode) => setState(() => _loopMode = mode)),
     ]);
+    _service.sleepAt.addListener(_onChanged);
+    _service.sleepAtEndOfSong.addListener(_onChanged);
+    _clock = Timer.periodic(Duration(seconds: 15), (_) => _onChanged());
+    LibraryStore.instance().then((store) {
+      if (!mounted) return;
+      store.addListener(_onChanged);
+      setState(() => _store = store);
+    }).catchError((Object e) => debugPrint("Error opening the library store: $e"));
+  }
+
+  void _onChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -55,8 +72,63 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }
+    _service.sleepAt.removeListener(_onChanged);
+    _service.sleepAtEndOfSong.removeListener(_onChanged);
+    _store?.removeListener(_onChanged);
+    _clock?.cancel();
     super.dispose();
   }
+
+  bool get _isFavourite {
+    File? song = _currentSong;
+    return song != null && (_store?.isFavourite(songKey(song)) ?? false);
+  }
+
+  /// The song playing now as a library file (null for radio).
+  File? get _currentSong {
+    String? path = _service.currentSongPath;
+    return path == null ? null : File(path);
+  }
+
+  /// Sleep timer label: minutes left, "End of song", or null when off.
+  String? get _sleepLabel {
+    if (_service.sleepAtEndOfSong.value) return "End of song";
+    DateTime? at = _service.sleepAt.value;
+    if (at == null) return null;
+    int minutes = (at.difference(DateTime.now()).inSeconds / 60).ceil();
+    return "$minutes min";
+  }
+
+  void _showSleepTimer() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: brandNavyRaised,
+      builder: (context) {
+        TextStyle style = TextStyle(color: Colors.white);
+        Widget option(String label, VoidCallback onTap) => ListTile(
+              title: Text(label, style: style),
+              onTap: () {
+                onTap();
+                Navigator.of(context).pop();
+              },
+            );
+        bool isRadio = isRadioItem(_item);
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              ListTile(title: Text("Sleep timer", style: style.copyWith(fontSize: 18, fontWeight: FontWeight.w600))),
+              if (_sleepLabel != null) option("Turn off", _service.cancelSleepTimer),
+              for (int minutes in [15, 30, 45, 60, 90])
+                option("$minutes minutes", () => _service.setSleepTimer(Duration(minutes: minutes))),
+              if (!isRadio) option("End of this song", _service.sleepAfterCurrentSong),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
 
   void _toggleShuffle() => _audioPlayer.setShuffleModeEnabled(!_isShuffling);
 
@@ -77,7 +149,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
   @override
   Widget build(BuildContext context) {
     MediaItem? item = _item;
-    bool isRadio = item?.album == 'Radio';
+    bool isRadio = isRadioItem(item);
     Color accent = brandBlueLight;
     Color muted = Colors.white70;
 
@@ -127,17 +199,49 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                     style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w600),
                   ),
                   SizedBox(height: 4),
-                  Text(item?.album ?? '', style: TextStyle(color: muted, fontSize: 14)),
+                  Text(item == null ? '' : itemSubtitle(item),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: muted, fontSize: 14)),
                   Expanded(
                     child: Center(
                       child: LayoutBuilder(
                         builder: (context, constraints) => Artwork(
                           size: (constraints.biggest.shortestSide * 0.85).clamp(120.0, 320.0),
                           isRadio: isRadio,
+                          coverPath: item?.artUri?.toFilePath(),
                         ),
                       ),
                     ),
                   ),
+
+                  // Favourite, add to playlist (songs only) and the sleep timer
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      if (_currentSong != null) ...[
+                        IconButton(
+                          tooltip: _isFavourite ? "Remove from favourites" : "Add to favourites",
+                          icon: Icon(_isFavourite ? Icons.favorite : Icons.favorite_border,
+                              color: _isFavourite ? accent : Colors.white),
+                          onPressed: () => _store?.toggleFavourite(songKey(_currentSong!)),
+                        ),
+                        IconButton(
+                          tooltip: "Add to playlist",
+                          icon: Icon(Icons.playlist_add, color: Colors.white),
+                          onPressed: () => showAddToPlaylist(context, _currentSong!),
+                        ),
+                      ],
+                      TextButton.icon(
+                        onPressed: _showSleepTimer,
+                        icon: Icon(Icons.bedtime_outlined, color: _sleepLabel == null ? Colors.white : accent),
+                        label: Text(_sleepLabel ?? "Sleep",
+                            style: TextStyle(color: _sleepLabel == null ? Colors.white : accent)),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8),
 
                   // Seek bar (songs only: a live stream has no length)
                   if (!isRadio) ...[
@@ -260,6 +364,10 @@ class _QueueSheet extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(color: isCurrent ? brandBlueLight : Colors.white),
                       ),
+                      subtitle: item == null
+                          ? null
+                          : Text(itemSubtitle(item),
+                              maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white60)),
                       onTap: () {
                         player.seek(Duration.zero, index: index);
                         player.play();

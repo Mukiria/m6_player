@@ -59,7 +59,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
     if (item == null) return SizedBox.shrink();
 
     ColorScheme colors = Theme.of(context).colorScheme;
-    bool isRadio = item.album == 'Radio';
+    bool isRadio = isRadioItem(item);
     // Radio streams have no length, so the ring just shows "playing" in full.
     double progress = _duration.inMilliseconds > 0
         ? (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0)
@@ -73,7 +73,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
           padding: EdgeInsets.fromLTRB(12, 8, 8, 8),
           child: Row(
             children: [
-              Artwork(size: 44, isRadio: isRadio, round: true),
+              Artwork(size: 44, isRadio: isRadio, round: true, coverPath: item.artUri?.toFilePath()),
               SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -82,7 +82,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                   children: [
                     Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
-                    Text(item.album ?? '', maxLines: 1, overflow: TextOverflow.ellipsis,
+                    Text(itemSubtitle(item), maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant)),
                   ],
                 ),

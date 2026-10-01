@@ -38,6 +38,26 @@ void main() {
     expect(find.byIcon(Icons.skip_next), findsNothing); // The mini player is hidden
   });
 
+  testWidgets('the music tab has Songs, Favourites and Playlists, and a sort menu', (tester) async {
+    await tester.pumpWidget(app());
+    await tester.pump(Duration(milliseconds: 100));
+
+    expect(find.text('Songs'), findsOneWidget);
+    expect(find.text('Favourites'), findsOneWidget);
+    expect(find.text('Playlists'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Sort'));
+    await tester.pumpAndSettle();
+    expect(find.text('Date added'), findsOneWidget);
+    expect(find.text('Artist'), findsOneWidget);
+    await tester.tapAt(Offset(10, 10)); // Close the menu
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Playlists'));
+    await tester.pumpAndSettle();
+    expect(find.text('New playlist'), findsOneWidget);
+  });
+
   testWidgets('the add button offers songs or a folder', (tester) async {
     await tester.pumpWidget(app());
     await tester.pump(Duration(milliseconds: 100));
