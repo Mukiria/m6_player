@@ -65,8 +65,8 @@ class OptionsSheet extends StatelessWidget {
       child: BackdropFilter(
         // Frosted glass: what's behind shows through, blurred, under a light tint.
         filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: Container(
-          width: double.infinity,
+        // Material (not a coloured box) so the buttons' tap ripples show on the tint.
+        child: Material(
           color: colors.surface.withValues(alpha: 0.72),
           child: SafeArea(
             top: false,
@@ -135,8 +135,7 @@ Future<void> showInfoSheet(BuildContext context, {required String title, require
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-          child: Container(
-            width: double.infinity,
+          child: Material(
             color: colors.surface.withValues(alpha: 0.72),
             child: SafeArea(
               top: false,
