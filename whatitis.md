@@ -21,7 +21,7 @@ Main code: `lib/screens/` (home with the nav bar, music, radio, now playing), `l
 
 **Design**: modelled on Visha Player's layout (Transsion's default player): clean light list screens, a bottom nav bar, a mini player above it, and a dark full-screen Now Playing. Uses m6's own logo and colours, not Visha's branding.
 
-## Where it stands (2026-09-29)
+## Where it stands (2026-10-01)
 
 **Done**
 - Cleaned up dead code, unused files and packages; dropped the desktop and web targets.
@@ -33,7 +33,7 @@ Main code: `lib/screens/` (home with the nav bar, music, radio, now playing), `l
 - Release signing via `android/key.properties`. The upload keystore is at `~/keystores/m6player-upload-keystore.jks`. It's gitignored and must never be committed.
 
 **Status**
-- Everything is committed and pushed. The latest CI run on `master` (commit `5a775fe`: radio filtering and error handling, app icons and name, `pubspec.lock`) passed on Android and iOS.
+- Everything is committed and pushed. The latest CI run on `master` (commit `5d84812`, 2026-10-01: Visha-style redesign, new logo and icons, video tab, folder import) passed on Android and iOS: analyze, 20 tests, release APK (56.6 MB) and the unsigned iOS build.
 - Nothing has been tested on a real phone yet.
 
 ## To do
