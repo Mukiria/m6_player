@@ -7,6 +7,9 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+    <!-- Nearby file transfer: replaces nearby_connections' declaration, which carries an
+         unusual android:minSdkVersion="32" attribute (see whatitis.md, item 21). -->
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" tools:node="replace" />
     <!-- Background playback (audio_service) -->
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>

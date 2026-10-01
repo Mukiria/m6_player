@@ -73,3 +73,11 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // nearby_connections ships play-services-nearby 19.2.0; on a phone with current
+    // Google Play services (itel S667LN, Android 13) that version's discovery failed
+    // with MISSING_PERMISSION_NEARBY_WIFI_DEVICES although the permission was granted.
+    // Use the current library (19.5.x no longer needs core library desugaring).
+    implementation("com.google.android.gms:play-services-nearby:19.5.1")
+}

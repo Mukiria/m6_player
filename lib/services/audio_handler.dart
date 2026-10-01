@@ -106,6 +106,11 @@ class M6AudioHandler extends BaseAudioHandler with SeekHandler {
     await super.stop();
   }
 
+  /// The app was swiped away from the recent apps: stop playback and remove
+  /// the notification, so swiping away really closes the app.
+  @override
+  Future<void> onTaskRemoved() => stop();
+
   @override
   Future<dynamic> customAction(String name, [Map<String, dynamic>? extras]) async {
     if (name == closeAction) await stop();

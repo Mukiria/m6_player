@@ -64,12 +64,19 @@ public class MainActivity extends AudioServiceActivity {
                             requestNearbyPermissions(result);
                             break;
                         case "deviceName":
-                            result.success(Build.MANUFACTURER + " " + Build.MODEL);
+                            result.success(deviceName());
                             break;
                         default:
                             result.notImplemented();
                     }
                 });
+    }
+
+    /** "itel S667LN" rather than "ITEL itel S667LN": the maker only when the model doesn't start with it. */
+    private static String deviceName() {
+        String maker = Build.MANUFACTURER, model = Build.MODEL;
+        if (model.toLowerCase().startsWith(maker.toLowerCase())) return model;
+        return maker + " " + model;
     }
 
     /** The runtime permissions Nearby Connections needs on this Android version. */
