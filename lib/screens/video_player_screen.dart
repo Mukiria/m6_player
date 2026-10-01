@@ -85,6 +85,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _open().whenComplete(() => _advancing = false);
       return;
     }
+    PlayerService.instance.videoPlaying.value = value.isPlaying;
     setState(() {}); // Position, playing state
   }
 
@@ -132,6 +133,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   void dispose() {
+    PlayerService.instance.videoPlaying.value = false;
     _hideTimer?.cancel();
     _controller?.dispose();
     SystemChrome.setPreferredOrientations([]); // Back to the app's normal rotation

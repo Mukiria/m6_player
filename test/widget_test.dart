@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m6player/screens/home_screen.dart';
+import 'package:m6player/services/player_service.dart';
 import 'package:m6player/theme.dart';
 import 'package:m6player/widgets/app_logo.dart';
+import 'package:m6player/widgets/logo_animation_data.dart';
 
 /// Screen tests run without a phone, so the audio plugins get fake channels
 /// that answer every call with nothing. The music library and radio list then
@@ -92,5 +94,31 @@ void main() {
     await tester.pumpWidget(MaterialApp(theme: darkTheme(), home: Scaffold(body: AppLogo())));
     await tester.pumpAndSettle(); // MaterialApp animates from one theme to the other
     expect(logoAsset(), 'assets/branding/logo-dark.svg');
+  });
+
+  testWidgets('the logo animates while something plays and is still otherwise', (tester) async {
+    bool isStill() => find.descendant(of: find.byType(AppLogo), matching: find.byType(SvgPicture)).evaluate().any(
+        (element) => (element.widget as SvgPicture).bytesLoader is SvgAssetLoader);
+
+    await tester.pumpWidget(MaterialApp(theme: lightTheme(), home: Scaffold(body: AppLogo())));
+    expect(isStill(), isTrue);
+
+    PlayerService.instance.videoPlaying.value = true;
+    await tester.pump();
+    await tester.pump(Duration(seconds: 3)); // Past the intro, into the wave loop
+    expect(isStill(), isFalse);
+    expect(find.descendant(of: find.byType(AppLogo), matching: find.byType(CustomPaint)), findsWidgets);
+
+    PlayerService.instance.videoPlaying.value = false;
+    await tester.pump();
+    expect(isStill(), isTrue);
+  });
+
+  test('the logo wave data is consistent', () {
+    expect(logoViewBox, hasLength(4));
+    for (List<double> frame in logoWaveY) {
+      expect(frame, hasLength(logoWaveX.length));
+    }
+    expect(logoWaveY.first, logoWaveY.last); // The loop ends where it starts
   });
 }

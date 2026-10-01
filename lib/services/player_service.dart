@@ -159,6 +159,10 @@ class PlayerService {
 
   MediaItem? get currentItem => player.sequenceState.currentSource?.tag as MediaItem?;
 
+  /// True while a video is playing (set by the video player), so the logo
+  /// can animate for videos as well as music.
+  final ValueNotifier<bool> videoPlaying = ValueNotifier(false);
+
   /// Sleep timer: when playback will pause, or null when it's off.
   final ValueNotifier<DateTime?> sleepAt = ValueNotifier(null);
 

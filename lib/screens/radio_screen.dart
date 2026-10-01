@@ -5,6 +5,7 @@ import '../services/player_service.dart';
 import '../services/radio_api.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/artwork.dart';
+import '../widgets/tab_background.dart';
 
 /// The Radio tab: popular stations for the phone's country, with search.
 class RadioScreen extends StatefulWidget {
@@ -118,61 +119,66 @@ class _RadioScreenState extends State<RadioScreen> {
   @override
   Widget build(BuildContext context) {
     ColorScheme colors = Theme.of(context).colorScheme;
-    return Scaffold(
-      appBar: AppBar(
-        title: AppLogo(),
-        centerTitle: false,
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: SearchBar(
-              controller: _searchController,
-              hintText: "Search stations",
-              leading: Icon(Icons.search),
-              elevation: WidgetStatePropertyAll(0),
-              backgroundColor: WidgetStatePropertyAll(colors.surfaceContainerHighest),
-            ),
-          ),
-          if (!_isLoading && !_loadFailed)
+    return TabBackground(
+      image: 'assets/backgrounds/radio.jpg',
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          title: AppLogo(),
+          centerTitle: false,
+        ),
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Padding(
-              padding: EdgeInsets.fromLTRB(16, 4, 16, 4),
-              child: Text("Stations in $_userCountry (${_filteredStations.length})",
-                  style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant)),
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: SearchBar(
+                controller: _searchController,
+                hintText: "Search stations",
+                leading: Icon(Icons.search),
+                elevation: WidgetStatePropertyAll(0),
+                backgroundColor: WidgetStatePropertyAll(colors.surfaceContainerHighest),
+              ),
             ),
-          Expanded(
-            child: _isLoading
-                ? Center(child: CircularProgressIndicator())
-                : _loadFailed
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.wifi_off, size: 48, color: colors.onSurfaceVariant),
-                            SizedBox(height: 12),
-                            Text(
-                              "Couldn't load radio stations.\nCheck your internet connection.",
-                              textAlign: TextAlign.center,
-                            ),
-                            SizedBox(height: 16),
-                            FilledButton.icon(
-                              onPressed: () => fetchRadioStations(_deviceCountryCode()),
-                              icon: Icon(Icons.refresh),
-                              label: Text("Retry"),
-                            ),
-                          ],
-                        ),
-                      )
-                    : _filteredStations.isEmpty
-                        ? Center(child: Text("No radio stations found for $_userCountry."))
-                        : ListView.builder(
-                            itemCount: _filteredStations.length,
-                            itemBuilder: (context, index) => _stationTile(_filteredStations[index], colors),
+            if (!_isLoading && !_loadFailed)
+              Padding(
+                padding: EdgeInsets.fromLTRB(16, 4, 16, 4),
+                child: Text("Stations in $_userCountry (${_filteredStations.length})",
+                    style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant)),
+              ),
+            Expanded(
+              child: _isLoading
+                  ? Center(child: CircularProgressIndicator())
+                  : _loadFailed
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.wifi_off, size: 48, color: colors.onSurfaceVariant),
+                              SizedBox(height: 12),
+                              Text(
+                                "Couldn't load radio stations.\nCheck your internet connection.",
+                                textAlign: TextAlign.center,
+                              ),
+                              SizedBox(height: 16),
+                              FilledButton.icon(
+                                onPressed: () => fetchRadioStations(_deviceCountryCode()),
+                                icon: Icon(Icons.refresh),
+                                label: Text("Retry"),
+                              ),
+                            ],
                           ),
-          ),
-        ],
+                        )
+                      : _filteredStations.isEmpty
+                          ? Center(child: Text("No radio stations found for $_userCountry."))
+                          : ListView.builder(
+                              itemCount: _filteredStations.length,
+                              itemBuilder: (context, index) => _stationTile(_filteredStations[index], colors),
+                            ),
+            ),
+          ],
+        ),
       ),
     );
   }

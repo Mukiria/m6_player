@@ -9,6 +9,7 @@ import '../widgets/app_logo.dart';
 import '../widgets/artwork.dart';
 import '../widgets/playlist_picker.dart';
 import '../widgets/song_list.dart';
+import '../widgets/tab_background.dart';
 import 'playlist_screen.dart';
 
 /// The Music tab: Songs, Favourites and Playlists, with sorting and adding
@@ -147,51 +148,56 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
   @override
   Widget build(BuildContext context) {
     ColorScheme colors = Theme.of(context).colorScheme;
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        appBar: AppBar(
-          title: AppLogo(),
-          centerTitle: false,
-          actions: [
-            PopupMenuButton<SortOrder>(
-              tooltip: "Sort",
-              icon: Icon(Icons.sort),
-              onSelected: _setSort,
-              itemBuilder: (context) => [
-                for (SortOrder order in SortOrder.values)
-                  CheckedPopupMenuItem(value: order, checked: order == _sort, child: Text(order.label)),
-              ],
-            ),
-            IconButton(
-              tooltip: "Add songs",
-              icon: Icon(Icons.add),
-              onPressed: _isImporting ? null : _showAddOptions,
-            ),
-          ],
-          bottom: PreferredSize(
-            preferredSize: Size.fromHeight(50),
-            child: Column(
-              children: [
-                TabBar(
-                  isScrollable: true,
-                  tabAlignment: TabAlignment.start,
-                  dividerColor: Colors.transparent,
-                  labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  unselectedLabelStyle: TextStyle(fontSize: 16),
-                  tabs: [Tab(text: "Songs"), Tab(text: "Favourites"), Tab(text: "Playlists")],
-                ),
-                SizedBox(height: 2, child: _isImporting ? LinearProgressIndicator(minHeight: 2) : null),
-              ],
+    return TabBackground(
+      image: 'assets/backgrounds/music.jpg',
+      child: DefaultTabController(
+        length: 3,
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            title: AppLogo(),
+            centerTitle: false,
+            actions: [
+              PopupMenuButton<SortOrder>(
+                tooltip: "Sort",
+                icon: Icon(Icons.sort),
+                onSelected: _setSort,
+                itemBuilder: (context) => [
+                  for (SortOrder order in SortOrder.values)
+                    CheckedPopupMenuItem(value: order, checked: order == _sort, child: Text(order.label)),
+                ],
+              ),
+              IconButton(
+                tooltip: "Add songs",
+                icon: Icon(Icons.add),
+                onPressed: _isImporting ? null : _showAddOptions,
+              ),
+            ],
+            bottom: PreferredSize(
+              preferredSize: Size.fromHeight(50),
+              child: Column(
+                children: [
+                  TabBar(
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    dividerColor: Colors.transparent,
+                    labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    unselectedLabelStyle: TextStyle(fontSize: 16),
+                    tabs: [Tab(text: "Songs"), Tab(text: "Favourites"), Tab(text: "Playlists")],
+                  ),
+                  SizedBox(height: 2, child: _isImporting ? LinearProgressIndicator(minHeight: 2) : null),
+                ],
+              ),
             ),
           ),
-        ),
-        body: TabBarView(
-          children: [
-            _songsTab(colors),
-            _favouritesTab(colors),
-            _playlistsTab(colors),
-          ],
+          body: TabBarView(
+            children: [
+              _songsTab(colors),
+              _favouritesTab(colors),
+              _playlistsTab(colors),
+            ],
+          ),
         ),
       ),
     );
