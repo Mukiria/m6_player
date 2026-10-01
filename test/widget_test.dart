@@ -70,6 +70,7 @@ void main() {
     expect(logoAsset(), 'assets/branding/logo-light.svg');
 
     await tester.pumpWidget(MaterialApp(theme: darkTheme(), home: Scaffold(body: AppLogo())));
+    await tester.pumpAndSettle(); // MaterialApp animates from one theme to the other
     expect(logoAsset(), 'assets/branding/logo-dark.svg');
   });
 }
