@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m6player/screens/home_screen.dart';
+import 'package:m6player/screens/onboarding_screen.dart';
+import 'package:m6player/services/app_settings.dart';
 import 'package:m6player/services/player_service.dart';
 import 'package:m6player/theme.dart';
 import 'package:m6player/widgets/app_logo.dart';
@@ -15,7 +17,9 @@ import 'package:m6player/widgets/options_sheet.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUpAll(() {
+  setUpAll(() async {
+    // The first-run intro pages would cover the home screen in every test below
+    await AppSettings.instance.setOnboarded();
     for (String channel in [
       'com.ryanheise.just_audio.methods',
       'com.ryanheise.audio_session',
@@ -59,6 +63,36 @@ void main() {
     await tester.tap(find.text('Playlists'));
     await tester.pumpAndSettle();
     expect(find.text('New playlist'), findsOneWidget);
+  });
+
+  testWidgets('the intro pages step through and close', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: lightTheme(),
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: Center(
+            child: TextButton(
+              onPressed: () => Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (context) => const OnboardingScreen())),
+              child: Text('open intro'),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('open intro'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Music, videos and radio'), findsOneWidget);
+    for (int i = 0; i < 3; i++) {
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+    }
+    expect(find.text('Permissions'), findsOneWidget);
+
+    await tester.tap(find.text('Get started'));
+    await tester.pumpAndSettle();
+    expect(find.text('open intro'), findsOneWidget); // Back where we started
   });
 
   testWidgets('the add button offers songs or a folder', (tester) async {
