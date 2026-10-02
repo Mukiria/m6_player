@@ -70,6 +70,7 @@ class LibraryStore extends ChangeNotifier {
   final List<Playlist> _playlists = [];
   final Set<String> _hidden = {}; // Hidden from every list
   final Set<String> _filteredOut = {}; // Removed from the Songs or Videos list only
+  final Map<String, int> _positions = {}; // Where each video stopped, in milliseconds
 
   SortOrder get sort => _sort;
   List<Playlist> get playlists => List.unmodifiable(_playlists);
@@ -96,6 +97,7 @@ class LibraryStore extends ChangeNotifier {
       _playlists.addAll((json['playlists'] as List? ?? []).map((p) => Playlist.fromJson(p)));
       _hidden.addAll((json['hidden'] as List? ?? []).cast<String>());
       _filteredOut.addAll((json['filteredOut'] as List? ?? []).cast<String>());
+      (json['positions'] as Map? ?? {}).forEach((key, ms) => _positions[key as String] = (ms as num).toInt());
     } catch (e) {
       debugPrint("Error loading library.json: $e"); // Start fresh rather than crash
     }
@@ -103,6 +105,10 @@ class LibraryStore extends ChangeNotifier {
 
   Future<void> _changed() async {
     notifyListeners();
+    await _save();
+  }
+
+  Future<void> _save() async {
     try {
       await _file.writeAsString(jsonEncode({
         'sort': _sort.name,
@@ -111,6 +117,7 @@ class LibraryStore extends ChangeNotifier {
         'playlists': _playlists.map((p) => p.toJson()).toList(),
         'hidden': _hidden.toList(),
         'filteredOut': _filteredOut.toList(),
+        'positions': _positions,
       }));
     } catch (e) {
       debugPrint("Error saving library.json: $e");
@@ -192,12 +199,26 @@ class LibraryStore extends ChangeNotifier {
     await _changed();
   }
 
+  /// Where a video stopped last time, or null to start from the beginning.
+  Duration? positionOf(String key) => _positions.containsKey(key) ? Duration(milliseconds: _positions[key]!) : null;
+
+  /// Remembers where a video stopped (null forgets it). Saves quietly: nothing listens to positions.
+  Future<void> setPosition(String key, Duration? position) async {
+    if (position == null) {
+      if (_positions.remove(key) == null) return;
+    } else {
+      _positions[key] = position.inMilliseconds;
+    }
+    await _save();
+  }
+
   /// An item was deleted: drop it from favourites, Latest, playlists, hidden and filtered.
   Future<void> forgetSong(String key) async {
     _favourites.remove(key);
     _latest.remove(key);
     _hidden.remove(key);
     _filteredOut.remove(key);
+    _positions.remove(key);
     for (Playlist list in _playlists) {
       list.songs.remove(key);
     }

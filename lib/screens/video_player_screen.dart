@@ -3,7 +3,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 import 'package:video_player/video_player.dart';
+import 'package:volume_controller/volume_controller.dart';
+import '../services/library_store.dart';
 import '../services/player_service.dart';
 import '../services/video_library.dart';
 import '../theme.dart';
@@ -37,6 +40,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Timer? _hideTimer;
   Duration? _dragPosition; // While the user drags the seek bar
 
+  LibraryStore? _store;
+  String? _loadedKey; // The video the controller holds, for saving its position
+  Duration _lastSaved = Duration.zero;
+
+  // Swipe gestures: up/down on the left changes brightness, on the right volume
+  double _brightness = 0.5;
+  double _volume = 0.5;
+  bool _dragIsBrightness = true;
+  IconData? _gestureIcon;
+  String _gestureText = '';
+  Timer? _gestureTimer;
+
   /// The video showing: from the list at [_index], or one from the up-next queue.
   late AssetEntity _video;
 
@@ -64,7 +79,61 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     // Music and video shouldn't play over each other.
     PlayerService.instance.player.pause();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    LibraryStore.instance().then((store) => _store = store);
+    _loadLevels();
     _open();
+  }
+
+  Future<void> _loadLevels() async {
+    try {
+      VolumeController.instance.showSystemUI = false; // We draw our own indicator
+      _brightness = await ScreenBrightness().application;
+      _volume = await VolumeController.instance.getVolume();
+    } catch (e) {
+      debugPrint("Error reading brightness/volume: $e");
+    }
+  }
+
+  /// Remembers where the loaded video is, so it can carry on from there next time.
+  /// Near the very start or end counts as "not started" / "finished".
+  void _savePosition() {
+    VideoPlayerController? controller = _controller;
+    String? key = _loadedKey;
+    if (controller == null || key == null || !controller.value.isInitialized) return;
+    Duration position = controller.value.position;
+    Duration duration = controller.value.duration;
+    bool resumable = position > Duration(seconds: 5) && position < duration - Duration(seconds: 5);
+    _store?.setPosition(key, resumable ? position : null);
+    _lastSaved = position;
+  }
+
+  void _showGesture(IconData icon, String text) {
+    _gestureTimer?.cancel();
+    setState(() {
+      _gestureIcon = icon;
+      _gestureText = text;
+    });
+    _gestureTimer = Timer(Duration(milliseconds: 800), () {
+      if (mounted) setState(() => _gestureIcon = null);
+    });
+  }
+
+  void _dragStart(DragStartDetails details) {
+    _dragIsBrightness = details.localPosition.dx < MediaQuery.of(context).size.width / 2;
+  }
+
+  void _dragUpdate(DragUpdateDetails details) {
+    // A swipe across half the screen height covers the whole range
+    double change = -details.delta.dy / (MediaQuery.of(context).size.height / 2);
+    if (_dragIsBrightness) {
+      _brightness = (_brightness + change).clamp(0.0, 1.0);
+      ScreenBrightness().setApplicationScreenBrightness(_brightness).catchError((_) {});
+      _showGesture(Icons.brightness_6, "${(_brightness * 100).round()}%");
+    } else {
+      _volume = (_volume + change).clamp(0.0, 1.0);
+      VolumeController.instance.setVolume(_volume).catchError((_) {});
+      _showGesture(_volume == 0 ? Icons.volume_off : Icons.volume_up, "${(_volume * 100).round()}%");
+    }
   }
 
   /// The videos in the playing video's folder (null when the phone gives no folder or it holds just one).
@@ -127,7 +196,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   Future<void> _open() async {
+    _savePosition();
     VideoPlayerController? old = _controller;
+    String key = videoKey(_video.id);
     setState(() {
       _controller = null;
       _failed = false;
@@ -143,6 +214,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         await controller.dispose();
         return;
       }
+      _store ??= await LibraryStore.instance();
+      Duration? resumeAt = _store?.positionOf(key);
+      if (resumeAt != null && resumeAt < controller.value.duration - Duration(seconds: 5)) {
+        await controller.seekTo(resumeAt);
+        _showGesture(Icons.history, "Resumed at ${formatDuration(resumeAt)}");
+      }
+      _loadedKey = key;
+      _lastSaved = resumeAt ?? Duration.zero;
       controller.addListener(_onTick);
       setState(() => _controller = controller);
       await controller.play();
@@ -160,6 +239,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (controller == null || !mounted) return;
     VideoPlayerValue value = controller.value;
     bool ended = value.isInitialized && !value.isPlaying && value.position >= value.duration && value.duration > Duration.zero;
+    if (ended) {
+      _store?.setPosition(_loadedKey!, null); // Watched to the end: next time starts over
+      _lastSaved = Duration.zero;
+    } else if ((value.position - _lastSaved).abs() >= Duration(seconds: 5)) {
+      _savePosition();
+    }
     if (ended && !_advancing && _hasNext) {
       _advancing = true;
       _goNext();
@@ -187,6 +272,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (controller == null) return;
     if (controller.value.isPlaying) {
       controller.pause();
+      _savePosition();
       _hideTimer?.cancel();
     } else {
       if (controller.value.position >= controller.value.duration) controller.seekTo(Duration.zero);
@@ -215,6 +301,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
   void dispose() {
     PlayerService.instance.videoPlaying.value = false;
+    _savePosition();
+    _gestureTimer?.cancel();
+    ScreenBrightness().resetApplicationScreenBrightness().catchError((_) {});
     _hideTimer?.cancel();
     _carouselScroll.dispose();
     _controller?.dispose();
@@ -238,6 +327,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           _skipBy(details.localPosition.dx < width / 2 ? -_skip : _skip);
         },
         onDoubleTap: () {}, // Needed for onDoubleTapDown to fire
+        onVerticalDragStart: _dragStart,
+        onVerticalDragUpdate: _dragUpdate,
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -249,6 +340,21 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       : CircularProgressIndicator(color: brandBlueLight),
             ),
             if (_showControls || _failed) _controls(controller, ready),
+            if (_gestureIcon != null)
+              Center(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(16)),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_gestureIcon, color: Colors.white, size: 32),
+                      SizedBox(height: 6),
+                      Text(_gestureText, style: TextStyle(color: Colors.white, fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       );
