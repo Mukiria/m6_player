@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'app_settings.dart';
+import 'library_store.dart';
 import 'track_info.dart';
 
 /// The one audio player shared by the music and radio screens, so only one
@@ -12,6 +13,7 @@ import 'track_info.dart';
 class PlayerService {
   PlayerService._() {
     _applySavedEqualizer();
+    _countPlays();
   }
   static final PlayerService instance = PlayerService._();
 
@@ -35,12 +37,33 @@ class PlayerService {
     });
   }
 
+  /// Counts a song as played once it has played for 30 seconds (or half of a
+  /// short one), and again each time it repeats. Feeds the smart playlists.
+  void _countPlays() {
+    String? counted; // The song already counted in this play
+    player.positionStream.listen((position) {
+      String? path = currentSongPath;
+      if (path == null || !player.playing) return;
+      if (position < Duration(seconds: 2)) {
+        counted = null; // Just started, or repeating
+        return;
+      }
+      Duration? length = player.duration;
+      Duration needed = length != null && length < Duration(seconds: 60) ? length ~/ 2 : Duration(seconds: 30);
+      if (counted != path && position >= needed) {
+        counted = path;
+        LibraryStore.instance().then((store) => store.recordPlay(songKey(File(path))));
+      }
+    });
+  }
+
   /// Asks Android 13+ for the notification permission (see MainActivity.java),
-  /// once per app run, the first time something plays.
+  /// once per app run, when the app opens rather than as the first song starts,
+  /// so the system prompt can't land in the middle of starting playback.
   static const MethodChannel _notifications = MethodChannel('com.msixv.com.m6player/notifications');
   bool _askedForNotifications = false;
 
-  void _askForNotifications() {
+  void askForNotifications() {
     if (_askedForNotifications || !Platform.isAndroid) return;
     _askedForNotifications = true;
     _notifications.invokeMethod('request').catchError((Object e) {
@@ -77,7 +100,6 @@ class PlayerService {
       queueId = id;
       _queuePaths = paths;
     }
-    _askForNotifications();
     // Not awaited: play() only completes once playback pauses or stops.
     player.play();
   }
@@ -175,11 +197,11 @@ class PlayerService {
     isLibraryActive = false;
     queueId = null;
     _queuePaths = [];
+    await player.setSpeed(1.0); // A live stream can't be sped up
     await player.setAudioSource(AudioSource.uri(
       Uri.parse(url),
       tag: MediaItem(id: url, title: title, album: 'Radio', extras: {'radio': true}),
     ));
-    _askForNotifications();
     player.play();
   }
 

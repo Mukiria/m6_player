@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -53,6 +54,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool get _sleepOn => _sleepAt != null || _sleepAtEnd;
 
   LibraryStore? _store;
+  final List<StreamSubscription> _sessionSubscriptions = [];
+  String? _countedKey; // The video already counted as played
   String? _loadedKey; // The video the controller holds, for saving its position
   Duration _lastSaved = Duration.zero;
 
@@ -93,7 +96,24 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     LibraryStore.instance().then((store) => _store = store);
     _loadLevels();
+    _pauseWhenInterrupted();
     _open();
+  }
+
+  /// Pauses when headphones are unplugged (or Bluetooth disconnects) and when a call or another app takes over the sound.
+  Future<void> _pauseWhenInterrupted() async {
+    try {
+      AudioSession session = await AudioSession.instance;
+      if (!mounted) return;
+      _sessionSubscriptions.addAll([
+        session.becomingNoisyEventStream.listen((_) => _controller?.pause()),
+        session.interruptionEventStream.listen((event) {
+          if (event.begin && event.type != AudioInterruptionType.duck) _controller?.pause();
+        }),
+      ]);
+    } catch (e) {
+      debugPrint("Error listening for audio interruptions: $e");
+    }
   }
 
   Future<void> _loadLevels() async {
@@ -330,6 +350,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (controller == null || !mounted) return;
     VideoPlayerValue value = controller.value;
     bool ended = value.isInitialized && !value.isPlaying && value.position >= value.duration && value.duration > Duration.zero;
+    if (_countedKey != _loadedKey && value.isPlaying && value.position >= (value.duration < Duration(seconds: 60) ? value.duration ~/ 2 : Duration(seconds: 30))) {
+      _countedKey = _loadedKey;
+      if (_loadedKey != null) _store?.recordPlay(_loadedKey!); // Counts towards the smart playlists
+    }
     if (ended) {
       _store?.setPosition(_loadedKey!, null); // Watched to the end: next time starts over
       _lastSaved = Duration.zero;
@@ -397,6 +421,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   void dispose() {
     PlayerService.instance.videoPlaying.value = false;
     _savePosition();
+    for (StreamSubscription subscription in _sessionSubscriptions) {
+      subscription.cancel();
+    }
     _gestureTimer?.cancel();
     _sleepTimer?.cancel();
     ScreenBrightness().resetApplicationScreenBrightness().catchError((_) {});

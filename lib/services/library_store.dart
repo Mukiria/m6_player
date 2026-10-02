@@ -62,6 +62,9 @@ class LibraryStore extends ChangeNotifier {
   LibraryStore._(this._file);
   static LibraryStore? _instance;
 
+  /// The store if it has been opened already (null before first use).
+  static LibraryStore? get loaded => _instance;
+
   /// The app-wide store, loaded from disk on first use.
   static Future<LibraryStore> instance() async {
     if (_instance == null) {
@@ -87,12 +90,15 @@ class LibraryStore extends ChangeNotifier {
   final Set<String> _hidden = {}; // Hidden from every list
   final Set<String> _filteredOut = {}; // Removed from the Songs or Videos list only
   final List<RadioStation> _radioFavourites = []; // Newest first
+  final List<RadioStation> _radioRecent = []; // Last played first
+  final Map<String, (int, int)> _plays = {}; // Item key: (times played, last played in ms since epoch)
   final Map<String, int> _positions = {}; // Where each video stopped, in milliseconds
 
   SortOrder get sort => _sort;
   VideoSort get videoSort => _videoSort;
   List<Playlist> get playlists => List.unmodifiable(_playlists);
   List<Playlist> playlistsOf(MediaKind kind) => _playlists.where((p) => p.kind == kind).toList();
+  List<RadioStation> get radioRecent => List.unmodifiable(_radioRecent);
   List<RadioStation> get radioFavourites => List.unmodifiable(_radioFavourites);
   bool isRadioFavourite(String url) => _radioFavourites.any((s) => s.url == url);
   bool isFavourite(String key) => _favourites.contains(key);
@@ -139,6 +145,15 @@ class LibraryStore extends ChangeNotifier {
       ..clear()
       ..addAll((json['radioFavourites'] as List? ?? []).map((s) =>
           RadioStation(name: s['name'] as String, url: s['url'] as String, country: s['country'] as String? ?? '')));
+    _radioRecent
+      ..clear()
+      ..addAll((json['radioRecent'] as List? ?? []).map((s) =>
+          RadioStation(name: s['name'] as String, url: s['url'] as String, country: s['country'] as String? ?? '')));
+    _plays.clear();
+    (json['plays'] as Map? ?? {}).forEach((key, value) {
+      List list = value as List;
+      _plays[key as String] = ((list[0] as num).toInt(), (list[1] as num).toInt());
+    });
     _positions.clear();
     (json['positions'] as Map? ?? {}).forEach((key, ms) => _positions[key as String] = (ms as num).toInt());
   }
@@ -152,6 +167,8 @@ class LibraryStore extends ChangeNotifier {
         'hidden': _hidden.toList(),
         'filteredOut': _filteredOut.toList(),
         'radioFavourites': _radioFavourites.map((s) => {'name': s.name, 'url': s.url, 'country': s.country}).toList(),
+        'radioRecent': _radioRecent.map((s) => {'name': s.name, 'url': s.url, 'country': s.country}).toList(),
+        'plays': {for (MapEntry<String, (int, int)> e in _plays.entries) e.key: [e.value.$1, e.value.$2]},
         'positions': _positions,
       };
 
@@ -227,6 +244,19 @@ class LibraryStore extends ChangeNotifier {
 
   Future<void> setVideoSort(VideoSort sort) async {
     _videoSort = sort;
+    await _changed();
+  }
+
+  /// Puts a station at the top of the recently played list (at most 30 are kept).
+  Future<void> addRadioRecent(RadioStation station) async {
+    _radioRecent.removeWhere((s) => s.url == station.url);
+    _radioRecent.insert(0, station);
+    if (_radioRecent.length > 30) _radioRecent.removeRange(30, _radioRecent.length);
+    await _changed();
+  }
+
+  Future<void> clearRadioRecent() async {
+    _radioRecent.clear();
     await _changed();
   }
 
@@ -310,6 +340,20 @@ class LibraryStore extends ChangeNotifier {
     await _changed();
   }
 
+  int playCount(String key) => _plays[key]?.$1 ?? 0;
+
+  /// When the item was last played, or null if never.
+  DateTime? lastPlayed(String key) {
+    int? ms = _plays[key]?.$2;
+    return ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
+  }
+
+  /// Counts a play of a song or video. Saves quietly: lists don't re-sort under you while you listen.
+  Future<void> recordPlay(String key) async {
+    _plays[key] = (playCount(key) + 1, DateTime.now().millisecondsSinceEpoch);
+    await _save();
+  }
+
   /// Where a video stopped last time, or null to start from the beginning.
   Duration? positionOf(String key) => _positions.containsKey(key) ? Duration(milliseconds: _positions[key]!) : null;
 
@@ -330,6 +374,7 @@ class LibraryStore extends ChangeNotifier {
     _hidden.remove(key);
     _filteredOut.remove(key);
     _positions.remove(key);
+    _plays.remove(key);
     for (Playlist list in _playlists) {
       list.songs.remove(key);
     }

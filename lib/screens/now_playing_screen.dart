@@ -233,6 +233,32 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                           onPressed: () => showAddTo(context, key: songKey(_currentSong!), kind: MediaKind.audio),
                         ),
                       ],
+                      if (!isRadio)
+                        PopupMenuButton<double>(
+                          tooltip: "Playback speed",
+                          initialValue: _audioPlayer.speed,
+                          color: brandNavyRaised,
+                          onSelected: (speed) {
+                            _audioPlayer.setSpeed(speed);
+                            setState(() {});
+                          },
+                          itemBuilder: (context) => [
+                            for (double speed in [0.5, 0.75, 1.0, 1.25, 1.5, 2.0])
+                              PopupMenuItem(value: speed, child: Text("${speed}x", style: TextStyle(color: Colors.white))),
+                          ],
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.speed, color: _audioPlayer.speed == 1.0 ? Colors.white : accent),
+                                SizedBox(width: 4),
+                                Text("${_audioPlayer.speed}x",
+                                    style: TextStyle(color: _audioPlayer.speed == 1.0 ? Colors.white : accent)),
+                              ],
+                            ),
+                          ),
+                        ),
                       TextButton.icon(
                         onPressed: _showSleepTimer,
                         icon: Icon(Icons.bedtime_outlined, color: _sleepLabel == null ? Colors.white : accent),

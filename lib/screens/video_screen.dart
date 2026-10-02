@@ -6,8 +6,10 @@ import '../widgets/app_logo.dart';
 import '../widgets/app_menu.dart';
 import '../widgets/item_actions.dart';
 import '../widgets/playlist_picker.dart';
+import '../widgets/video_folders.dart';
 import '../widgets/video_list.dart';
 import 'playlist_screen.dart';
+import 'smart_playlist_screen.dart';
 
 /// The Video tab: Videos (every video on the phone, newest first), Favourites,
 /// Latest and Playlists. Hidden videos are left out of every list, filtered-out
@@ -102,7 +104,7 @@ class _VideoScreenState extends State<VideoScreen> {
   Widget build(BuildContext context) {
     ColorScheme colors = Theme.of(context).colorScheme;
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Scaffold(
         appBar: AppBar(
           title: AppLogo(),
@@ -131,7 +133,7 @@ class _VideoScreenState extends State<VideoScreen> {
             dividerColor: Colors.transparent,
             labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             unselectedLabelStyle: TextStyle(fontSize: 16),
-            tabs: [Tab(text: "Videos"), Tab(text: "Favourites"), Tab(text: "Latest"), Tab(text: "Playlists")],
+            tabs: [Tab(text: "Videos"), Tab(text: "Folders"), Tab(text: "Favourites"), Tab(text: "Latest"), Tab(text: "Playlists")],
           ),
         ),
         body: _library.isLoading && _library.videos.isEmpty
@@ -148,6 +150,7 @@ class _VideoScreenState extends State<VideoScreen> {
                 : TabBarView(
                     children: [
                       _listOrMessage(colors, _all, ItemList.all, "Videos", "No videos on this phone yet."),
+                      VideoFolders(),
                       _listOrMessage(colors, _favourites, ItemList.favourites, "Favourites",
                           "No favourite videos yet. Use a video's ⋮ menu."),
                       _listOrMessage(
@@ -174,6 +177,7 @@ class _VideoScreenState extends State<VideoScreen> {
     return ListView(
       padding: EdgeInsets.only(bottom: 8),
       children: [
+        SmartPlaylistTiles(kind: MediaKind.video),
         ListTile(
           leading: Container(
             width: 48,

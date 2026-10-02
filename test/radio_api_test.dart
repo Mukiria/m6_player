@@ -56,4 +56,18 @@ void main() {
       expect(parseStations('[]'), isEmpty);
     });
   });
+
+  group('parseCountries', () {
+    test('keeps countries with a code, a name and stations', () {
+      final countries = parseCountries('''[
+        {"name": "Kenya", "iso_3166_1": "KE", "stationcount": 42},
+        {"name": "", "iso_3166_1": "XX", "stationcount": 3},
+        {"name": "Nowhere", "iso_3166_1": "NW", "stationcount": 0}
+      ]''');
+
+      expect(countries, hasLength(1));
+      expect(countries.first.code, 'KE');
+      expect(countries.first.stations, 42);
+    });
+  });
 }

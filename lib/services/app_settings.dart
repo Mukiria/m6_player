@@ -17,12 +17,14 @@ class AppSettings extends ChangeNotifier {
   bool _equalizerOn = false;
   String _equalizerPreset = 'Flat';
   List<double> _equalizerGains = []; // dB per band, lowest frequency first
+  String? _radioCountry; // ISO code chosen in Radio; null follows the phone's region
   String? _pinSalt; // The Hidden page's PIN is kept only as a salted hash
   String? _pinHash;
 
   ThemeMode get themeMode => _themeMode;
   bool get equalizerOn => _equalizerOn;
   String get equalizerPreset => _equalizerPreset;
+  String? get radioCountry => _radioCountry;
   bool get hasPin => _pinHash != null;
   List<double> get equalizerGains => List.unmodifiable(_equalizerGains);
 
@@ -36,6 +38,7 @@ class AppSettings extends ChangeNotifier {
       _equalizerOn = json['equalizerOn'] == true;
       _equalizerPreset = json['equalizerPreset'] as String? ?? 'Flat';
       _equalizerGains = (json['equalizerGains'] as List? ?? []).map((g) => (g as num).toDouble()).toList();
+      _radioCountry = json['radioCountry'] as String?;
       _pinSalt = json['pinSalt'] as String?;
       _pinHash = json['pinHash'] as String?;
       notifyListeners();
@@ -54,6 +57,7 @@ class AppSettings extends ChangeNotifier {
         'equalizerOn': _equalizerOn,
         'equalizerPreset': _equalizerPreset,
         'equalizerGains': _equalizerGains,
+        'radioCountry': _radioCountry,
         'pinSalt': _pinSalt,
         'pinHash': _pinHash,
       }));
@@ -80,6 +84,11 @@ class AppSettings extends ChangeNotifier {
       _pinSalt = List.generate(16, (_) => Random.secure().nextInt(256).toRadixString(16)).join();
       _pinHash = _hash(_pinSalt!, pin);
     }
+    await _save();
+  }
+
+  Future<void> setRadioCountry(String? code) async {
+    _radioCountry = code;
     await _save();
   }
 

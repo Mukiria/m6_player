@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/player_service.dart';
 import '../widgets/mini_player.dart';
 import 'music_player_screen.dart';
 import 'radio_screen.dart';
@@ -15,6 +16,13 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _tab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Before anything plays, so the system prompt can't interrupt the first song.
+    WidgetsBinding.instance.addPostFrameCallback((_) => PlayerService.instance.askForNotifications());
+  }
 
   @override
   Widget build(BuildContext context) {

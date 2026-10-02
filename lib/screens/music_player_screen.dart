@@ -9,10 +9,12 @@ import '../widgets/app_logo.dart';
 import '../widgets/app_menu.dart';
 import '../widgets/artwork.dart';
 import '../widgets/item_actions.dart';
+import '../widgets/music_browse.dart';
 import '../widgets/playlist_picker.dart';
 import '../widgets/song_list.dart';
 import '../widgets/tab_background.dart';
 import 'playlist_screen.dart';
+import 'smart_playlist_screen.dart';
 
 /// The Music tab: Songs, Favourites, Latest and Playlists, with sorting and
 /// adding music. Hidden songs are left out of every list, filtered-out ones out
@@ -168,7 +170,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
     return TabBackground(
       image: 'assets/backgrounds/music.jpg',
       child: DefaultTabController(
-        length: 4,
+        length: 5,
         child: Scaffold(
           backgroundColor: Colors.transparent,
           appBar: AppBar(
@@ -203,7 +205,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
                     dividerColor: Colors.transparent,
                     labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                     unselectedLabelStyle: TextStyle(fontSize: 16),
-                    tabs: [Tab(text: "Songs"), Tab(text: "Favourites"), Tab(text: "Latest"), Tab(text: "Playlists")],
+                    tabs: [Tab(text: "Songs"), Tab(text: "Browse"), Tab(text: "Favourites"), Tab(text: "Latest"), Tab(text: "Playlists")],
                   ),
                   SizedBox(height: 2, child: _isImporting ? LinearProgressIndicator(minHeight: 2) : null),
                 ],
@@ -213,6 +215,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
           body: TabBarView(
             children: [
               _songsTab(colors),
+              MusicBrowse(),
               _favouritesTab(colors),
               _latestTab(colors),
               _playlistsTab(colors),
@@ -286,6 +289,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
     return ListView(
       padding: EdgeInsets.only(bottom: 8),
       children: [
+        SmartPlaylistTiles(kind: MediaKind.audio),
         ListTile(
           leading: Container(
             width: 48,

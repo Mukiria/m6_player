@@ -21,6 +21,7 @@ dependencies:
   video_player: ^2.10.0  # Plays them
   share_plus: ^13.3.1  # Share a song or video to other apps
   url_launcher: ^6.3.2  # Opens the privacy policy and terms in the browser
+  audio_session: ^0.2.4  # Pauses the video when headphones are unplugged or a call comes in
   crypto: ^3.0.6  # Hashes the Hidden page's PIN
   screen_brightness: ^2.1.11  # Brightness swipe in the video player (this app's window only)
   volume_controller: ^3.7.1  # Volume swipe in the video player
