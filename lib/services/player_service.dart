@@ -4,15 +4,36 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_service/audio_service.dart' show MediaItem;
+import 'app_settings.dart';
 import 'track_info.dart';
 
 /// The one audio player shared by the music and radio screens, so only one
 /// thing plays at a time and playback continues in the background.
 class PlayerService {
-  PlayerService._();
+  PlayerService._() {
+    _applySavedEqualizer();
+  }
   static final PlayerService instance = PlayerService._();
 
-  final AudioPlayer player = AudioPlayer();
+  /// The equalizer (Android only); see EqualizerScreen.
+  final AndroidEqualizer equalizer = AndroidEqualizer();
+
+  late final AudioPlayer player = AudioPlayer(audioPipeline: AudioPipeline(androidAudioEffects: [equalizer]));
+
+  /// Turns the equalizer on or off as saved, and restores the saved band gains
+  /// once Android makes the equalizer available (after something first plays).
+  void _applySavedEqualizer() {
+    AppSettings settings = AppSettings.instance;
+    equalizer.setEnabled(settings.equalizerOn);
+    equalizer.parameters.then((parameters) {
+      List<double> gains = settings.equalizerGains;
+      for (AndroidEqualizerBand band in parameters.bands) {
+        if (band.index < gains.length) {
+          band.setGain(gains[band.index].clamp(parameters.minDecibels, parameters.maxDecibels));
+        }
+      }
+    });
+  }
 
   /// Asks Android 13+ for the notification permission (see MainActivity.java),
   /// once per app run, the first time something plays.

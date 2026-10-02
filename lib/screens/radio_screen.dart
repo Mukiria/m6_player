@@ -4,6 +4,7 @@ import 'package:just_audio/just_audio.dart';
 import '../services/player_service.dart';
 import '../services/radio_api.dart';
 import '../widgets/app_logo.dart';
+import '../widgets/app_menu.dart';
 import '../widgets/artwork.dart';
 import '../widgets/tab_background.dart';
 
@@ -127,6 +128,7 @@ class _RadioScreenState extends State<RadioScreen> {
           backgroundColor: Colors.transparent,
           title: AppLogo(),
           centerTitle: false,
+          actions: const [AppMenuButton()],
         ),
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

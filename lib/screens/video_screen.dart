@@ -1,15 +1,13 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import '../services/library_store.dart';
 import '../services/video_library.dart';
 import '../widgets/app_logo.dart';
+import '../widgets/app_menu.dart';
 import '../widgets/item_actions.dart';
 import '../widgets/playlist_picker.dart';
 import '../widgets/video_list.dart';
-import 'hidden_screen.dart';
 import 'playlist_screen.dart';
-import 'transfer_screen.dart';
 
 /// The Video tab: Videos (every video on the phone, newest first), Favourites,
 /// Latest and Playlists. Hidden videos are left out of every list, filtered-out
@@ -99,16 +97,7 @@ class _VideoScreenState extends State<VideoScreen> {
               icon: Icon(Icons.refresh),
               onPressed: _library.isLoading ? null : _library.load,
             ),
-            PopupMenuButton<String>(
-              tooltip: "More",
-              onSelected: (action) => Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) => action == "hidden" ? const HiddenScreen() : const TransferScreen(),
-              )),
-              itemBuilder: (context) => [
-                PopupMenuItem(value: "hidden", child: Text("Hidden & filtered")),
-                if (Platform.isAndroid) PopupMenuItem(value: "receive", child: Text("Receive files")),
-              ],
-            ),
+            const AppMenuButton(),
           ],
           bottom: TabBar(
             isScrollable: true,

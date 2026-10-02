@@ -20,6 +20,7 @@ dependencies:
   photo_manager: ^3.12.0  # Lists the phone's videos (with thumbnails); also asks for the audio permission
   video_player: ^2.10.0  # Plays them
   share_plus: ^13.3.1  # Share a song or video to other apps
+  url_launcher: ^6.3.2  # Opens the privacy policy and terms in the browser
 
 dev_dependencies:
   flutter_test:

@@ -40,6 +40,10 @@ class _SongListState extends State<SongList> {
   String? _currentPath; // The song playing now
   bool _isPlaying = false;
 
+  /// Every row is this tall, so a song's position in the list is known exactly.
+  static const double _rowHeight = 72;
+  final ScrollController _scroll = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -47,8 +51,15 @@ class _SongListState extends State<SongList> {
     _isPlaying = _service.player.playing;
     _subscriptions.addAll([
       _service.player.playerStateStream.listen((state) => setState(() => _isPlaying = state.playing)),
-      _service.currentItemStream.listen((_) => setState(() => _currentPath = _service.currentSongPath)),
+      _service.currentItemStream.listen((_) {
+        String? path = _service.currentSongPath;
+        if (path == _currentPath) return;
+        setState(() => _currentPath = path);
+        _scrollToPlaying(animate: true); // Next, previous or a song ending moves the list along
+      }),
     ]);
+    // Opening the list shows the playing song at the top straight away.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToPlaying(animate: false));
     LibraryStore.instance().then((store) {
       if (!mounted) return;
       store.addListener(_onStoreChanged);
@@ -59,12 +70,34 @@ class _SongListState extends State<SongList> {
   void _onStoreChanged() => setState(() {});
 
   @override
+  void didUpdateWidget(SongList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A new sort (or songs added or removed) moves the playing song: put it back on top.
+    bool sameOrder = oldWidget.songs.length == widget.songs.length &&
+        Iterable.generate(widget.songs.length).every((i) => oldWidget.songs[i].path == widget.songs[i].path);
+    if (!sameOrder) WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToPlaying(animate: true));
+  }
+
+  @override
   void dispose() {
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }
     _store?.removeListener(_onStoreChanged);
+    _scroll.dispose();
     super.dispose();
+  }
+
+  /// Brings the playing song (if it's in this list) to the top of the list.
+  void _scrollToPlaying({required bool animate}) {
+    int index = widget.songs.indexWhere((song) => song.path == _currentPath);
+    if (index < 0 || !_scroll.hasClients) return;
+    double offset = (index * _rowHeight).clamp(0.0, _scroll.position.maxScrollExtent);
+    if (animate) {
+      _scroll.animateTo(offset, duration: Duration(milliseconds: 450), curve: Curves.easeOutCubic);
+    } else {
+      _scroll.jumpTo(offset);
+    }
   }
 
   /// Tapping a song plays it; tapping the current song pauses or resumes it.
@@ -85,18 +118,27 @@ class _SongListState extends State<SongList> {
   Widget build(BuildContext context) {
     ColorScheme colors = Theme.of(context).colorScheme;
     String? header = widget.header;
-    return ListView.builder(
-      padding: EdgeInsets.only(bottom: 8),
-      itemCount: widget.songs.length + (header == null ? 0 : 1),
-      itemBuilder: (context, index) {
-        if (header != null && index == 0) {
-          return Padding(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (header != null)
+          Padding(
             padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Text(header, style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant)),
-          );
-        }
-        return _songTile(index - (header == null ? 0 : 1), colors);
-      },
+          ),
+        Expanded(
+          child: LayoutBuilder(
+            // Room under the last song so that any song, even the last, can sit at the top.
+            builder: (context, constraints) => ListView.builder(
+              controller: _scroll,
+              itemExtent: _rowHeight,
+              padding: EdgeInsets.only(bottom: (constraints.maxHeight - _rowHeight).clamp(8.0, double.infinity)),
+              itemCount: widget.songs.length,
+              itemBuilder: (context, index) => _songTile(index, colors),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

@@ -6,14 +6,13 @@ import '../services/player_service.dart';
 import '../services/track_info.dart';
 import '../utils/file_helper.dart';
 import '../widgets/app_logo.dart';
+import '../widgets/app_menu.dart';
 import '../widgets/artwork.dart';
 import '../widgets/item_actions.dart';
 import '../widgets/playlist_picker.dart';
 import '../widgets/song_list.dart';
 import '../widgets/tab_background.dart';
-import 'hidden_screen.dart';
 import 'playlist_screen.dart';
-import 'transfer_screen.dart';
 
 /// The Music tab: Songs, Favourites, Latest and Playlists, with sorting and
 /// adding music. Hidden songs are left out of every list, filtered-out ones out
@@ -191,16 +190,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
                 icon: Icon(Icons.add),
                 onPressed: _isImporting ? null : _showAddOptions,
               ),
-              PopupMenuButton<String>(
-                tooltip: "More",
-                onSelected: (action) => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (context) => action == "hidden" ? const HiddenScreen() : const TransferScreen(),
-                )),
-                itemBuilder: (context) => [
-                  PopupMenuItem(value: "hidden", child: Text("Hidden & filtered")),
-                  if (Platform.isAndroid) PopupMenuItem(value: "receive", child: Text("Receive files")),
-                ],
-              ),
+              const AppMenuButton(),
             ],
             bottom: PreferredSize(
               preferredSize: Size.fromHeight(50),

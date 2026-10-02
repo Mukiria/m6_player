@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:audio_service/audio_service.dart';
 import 'screens/home_screen.dart';
+import 'services/app_settings.dart';
 import 'services/audio_handler.dart';
 import 'services/player_service.dart';
 import 'theme.dart';
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AppSettings.instance.load(); // Light/dark mode and the equalizer, before anything uses them
   // Keeps playback going in the background, with notification, lock-screen and
   // headset controls (see M6AudioHandler for the notification's buttons).
   await AudioService.init(
@@ -26,13 +29,16 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'M6 Player',
-      // Light or dark, following the phone's setting
-      theme: lightTheme(),
-      darkTheme: darkTheme(),
-      themeMode: ThemeMode.system,
-      home: const HomeScreen(),
+    // Light or dark as chosen under ⋮ → Light / dark mode (default: same as the phone).
+    return ListenableBuilder(
+      listenable: AppSettings.instance,
+      builder: (context, _) => MaterialApp(
+        title: 'M6 Player',
+        theme: lightTheme(),
+        darkTheme: darkTheme(),
+        themeMode: AppSettings.instance.themeMode,
+        home: const HomeScreen(),
+      ),
     );
   }
 }

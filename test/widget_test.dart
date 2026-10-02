@@ -150,4 +150,17 @@ void main() {
     expect(tapped, 'next');
     expect(find.text('Malaika'), findsNothing); // Closed
   });
+
+  testWidgets('the top-bar menu has light/dark mode and the legal links', (tester) async {
+    await tester.pumpWidget(app());
+    await tester.pump(Duration(milliseconds: 100));
+
+    await tester.tap(find.byTooltip('More').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Light / dark mode'), findsOneWidget);
+    expect(find.text('Hidden & filtered'), findsOneWidget);
+    expect(find.text('Privacy policy'), findsOneWidget);
+    expect(find.text('Terms of service (EULA)'), findsOneWidget);
+  });
 }
