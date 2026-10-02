@@ -33,8 +33,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   VideoPlayerController? _controller;
   late int _index;
   late List<AssetEntity> _queue; // What next/previous walk through
-  final ScrollController _carouselScroll = ScrollController();
-  static const double _carouselItemWidth = 136;
+  static const double _carouselFraction = 0.6; // Share of the width one carousel page takes
+  final PageController _carouselPages = PageController(viewportFraction: _carouselFraction);
+  int _carouselShown = -1; // Which carousel page was last slid to
   bool _failed = false;
   bool _showControls = true;
   bool _isLandscape = false;
@@ -268,40 +269,49 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _open();
   }
 
+  /// The folder's videos as pages, one and a bit on screen at a time: each swipe
+  /// moves along by one video. Tapping one plays it; the playing one has a white outline.
   Widget _carousel(List<AssetEntity> folder) {
     int current = folder.indexWhere((v) => v.id == _video.id);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_carouselScroll.hasClients || current < 0) return;
-      double viewport = _carouselScroll.position.viewportDimension;
-      double target = current * _carouselItemWidth - (viewport - _carouselItemWidth) / 2;
-      _carouselScroll.animateTo(target.clamp(0.0, _carouselScroll.position.maxScrollExtent),
-          duration: Duration(milliseconds: 250), curve: Curves.easeOut);
-    });
-    return SizedBox(
-      height: 96,
-      child: ListView.builder(
-        controller: _carouselScroll,
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.symmetric(horizontal: 8),
-        itemExtent: _carouselItemWidth,
-        itemCount: folder.length,
-        itemBuilder: (context, i) {
-          bool selected = i == current;
-          return GestureDetector(
-            onTap: () => _playFromFolder(folder, folder[i]),
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: selected ? Colors.white : Colors.transparent, width: 2),
+    // Slide to the playing video only when it changes, never while the user is swiping.
+    if (current >= 0 && current != _carouselShown) {
+      _carouselShown = current;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _carouselPages.hasClients) {
+          _carouselPages.animateToPage(current, duration: Duration(milliseconds: 250), curve: Curves.easeOut);
+        }
+      });
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        double pageWidth = constraints.maxWidth * _carouselFraction;
+        double thumbWidth = pageWidth - 12;
+        double thumbHeight = thumbWidth * 9 / 16;
+        return SizedBox(
+          height: thumbHeight + 16,
+          child: PageView.builder(
+            controller: _carouselPages,
+            itemCount: folder.length,
+            itemBuilder: (context, i) {
+              bool selected = i == current;
+              return GestureDetector(
+                onTap: () => _playFromFolder(folder, folder[i]),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: selected ? Colors.white : Colors.transparent, width: 2),
+                    ),
+                    child: VideoThumbnail(
+                        key: ValueKey(folder[i].id), video: folder[i], width: thumbWidth - 4, height: thumbHeight - 4),
+                  ),
                 ),
-                child: VideoThumbnail(key: ValueKey(folder[i].id), video: folder[i], width: _carouselItemWidth, height: 88),
-              ),
-            ),
-          );
-        },
-      ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -428,7 +438,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _sleepTimer?.cancel();
     ScreenBrightness().resetApplicationScreenBrightness().catchError((_) {});
     _hideTimer?.cancel();
-    _carouselScroll.dispose();
+    _carouselPages.dispose();
     _controller?.dispose();
     SystemChrome.setPreferredOrientations([]); // Back to the app's normal rotation
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
