@@ -154,9 +154,11 @@ class _ThumbnailCache {
     if (cached == null) {
       cached = video.thumbnailDataWithSize(ThumbnailSize(256, 144), quality: 80);
       // A failed or empty thumbnail isn't kept, so it's tried again next time.
-      cached.then((data) {
+      cached.then<void>((data) {
         if (data == null) _entries.remove(video.id);
-      }, onError: (Object e) => _entries.remove(video.id));
+      }, onError: (Object e) {
+        _entries.remove(video.id);
+      });
     }
     _entries[video.id] = cached; // Now the most recent
     if (_entries.length > _capacity) _entries.remove(_entries.keys.first);
