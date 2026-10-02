@@ -27,7 +27,8 @@ void main() {
     expect(reopened.transfers, hasLength(30));
     expect(reopened.transfers.first.name, 'song 31.mp3');
     expect(reopened.transfers.first.ok, isFalse);
-    expect(reopened.transfers[1].sent, isFalse);
+    expect(reopened.transfers.first.sent, isFalse); // 31 is odd: received
+    expect(reopened.transfers[1].sent, isTrue); // 30 is even: sent
 
     await reopened.clearTransfers();
     expect((await LibraryStore.open(file)).transfers, isEmpty);
