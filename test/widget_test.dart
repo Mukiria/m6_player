@@ -100,17 +100,17 @@ void main() {
       ),
     ));
     await tester.tap(find.text('open intro'));
-    await tester.pumpAndSettle();
+    await tester.pump(Duration(milliseconds: 500)); // The animated logo never settles
 
     expect(find.text('Music, videos and radio'), findsOneWidget);
     for (int i = 0; i < 3; i++) {
       await tester.tap(find.text('Next'));
-      await tester.pumpAndSettle();
+      await tester.pump(Duration(milliseconds: 500)); // The animated logo never settles
     }
     expect(find.text('Permissions'), findsOneWidget);
 
     await tester.tap(find.text('Get started'));
-    await tester.pumpAndSettle();
+    await tester.pump(Duration(milliseconds: 500)); // The animated logo never settles
     expect(find.text('open intro'), findsOneWidget); // Back where we started
   });
 

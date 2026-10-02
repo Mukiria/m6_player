@@ -103,7 +103,10 @@ class M6AudioHandler extends BaseAudioHandler with SeekHandler {
   // Android Auto: the car's browse menu and voice commands (see CarBrowser).
   @override
   Future<List<MediaItem>> getChildren(String parentMediaId, [Map<String, dynamic>? options]) =>
-      CarBrowser.children(parentMediaId);
+      CarBrowser.children(parentMediaId, options);
+
+  @override
+  Future<List<MediaItem>> search(String query, [Map<String, dynamic>? extras]) => CarBrowser.search(query);
 
   @override
   Future<MediaItem?> getMediaItem(String mediaId) => CarBrowser.item(mediaId);

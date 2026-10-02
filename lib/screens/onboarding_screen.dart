@@ -49,6 +49,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               alignment: Alignment.centerRight,
               child: TextButton(onPressed: _finish, child: Text(last ? "" : "Skip")),
             ),
+            // The animated logo stays above every page
+            AppLogo(height: 56, alwaysAnimate: true),
             Expanded(
               child: PageView.builder(
                 controller: _controller,
@@ -64,7 +66,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            if (index == 0) ...[AppLogo(height: 56), SizedBox(height: 24)],
                             Icon(icon, size: 72, color: colors.primary),
                             SizedBox(height: 24),
                             Text(title,

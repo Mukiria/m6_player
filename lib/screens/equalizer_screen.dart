@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart';
 import '../services/app_settings.dart';
-import '../services/player_service.dart';
+import '../services/equalizer_service.dart';
 
 /// The equalizer (Android): an on/off switch, presets, and a slider per
 /// frequency band. Settings are saved and applied every time the app plays.
@@ -15,22 +14,30 @@ class EqualizerScreen extends StatefulWidget {
 }
 
 class _EqualizerScreenState extends State<EqualizerScreen> {
-  final AndroidEqualizer _equalizer = PlayerService.instance.equalizer;
+  final EqualizerService _equalizer = EqualizerService.instance;
   final AppSettings _settings = AppSettings.instance;
-  AndroidEqualizerParameters? _parameters;
-  late List<double> _gains; // What the sliders show, dB per band
+  EqualizerParameters? _parameters;
+  List<double> _gains = []; // What the sliders show, dB per band
 
   @override
   void initState() {
     super.initState();
-    _gains = [];
-    _equalizer.parameters.then((parameters) {
-      if (!mounted) return;
-      setState(() {
-        _parameters = parameters;
-        _gains = [for (AndroidEqualizerBand band in parameters.bands) band.gain];
-      });
-    });
+    _equalizer.parameters.addListener(_onParameters);
+    _onParameters(initial: true);
+  }
+
+  @override
+  void dispose() {
+    _equalizer.parameters.removeListener(_onParameters);
+    super.dispose();
+  }
+
+  /// The phone's equalizer became available (or changed session).
+  void _onParameters({bool initial = false}) {
+    EqualizerParameters? parameters = _equalizer.parameters.value;
+    _parameters = parameters;
+    _gains = parameters == null ? [] : [for (EqBand band in parameters.bands) band.gain];
+    if (!initial && mounted) setState(() {});
   }
 
   Future<void> _setOn(bool on) async {
@@ -40,29 +47,27 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   }
 
   Future<void> _applyPreset(String preset) async {
-    AndroidEqualizerParameters? parameters = _parameters;
+    EqualizerParameters? parameters = _parameters;
     if (parameters == null) return;
     List<double> gains = [
-      for (AndroidEqualizerBand band in parameters.bands)
-        presetGain(preset, band.centerFrequency) // just_audio gives hertz
-            .clamp(parameters.minDecibels, parameters.maxDecibels)
-            .toDouble(),
+      for (EqBand band in parameters.bands)
+        presetGain(preset, band.hertz).clamp(parameters.minDb, parameters.maxDb).toDouble(),
     ];
-    for (AndroidEqualizerBand band in parameters.bands) {
-      await band.setGain(gains[band.index]);
+    for (EqBand band in parameters.bands) {
+      await _equalizer.setGain(band.index, gains[band.index]);
     }
     if (!_settings.equalizerOn) await _setOn(true); // Choosing a preset turns it on
     await _settings.setEqualizerGains(gains, preset: preset);
     setState(() => _gains = gains);
   }
 
-  Future<void> _setBand(AndroidEqualizerBand band, double gain, {bool save = false}) async {
+  Future<void> _setBand(EqBand band, double gain, {bool save = false}) async {
     setState(() => _gains[band.index] = gain);
-    await band.setGain(gain);
+    await _equalizer.setGain(band.index, gain);
     if (save) await _settings.setEqualizerGains(_gains, preset: 'Custom');
   }
 
-  /// "60 Hz", "1.2 kHz" (just_audio gives band frequencies in hertz).
+  /// "60 Hz", "1.2 kHz" (the phone's bands, in hertz).
   String _frequency(double hertz) {
     return hertz >= 1000 ? "${(hertz / 1000).toStringAsFixed(hertz >= 10000 ? 0 : 1)} kHz" : "${hertz.round()} Hz";
   }
@@ -104,7 +109,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   @override
   Widget build(BuildContext context) {
     ColorScheme colors = Theme.of(context).colorScheme;
-    AndroidEqualizerParameters? parameters = _parameters;
+    EqualizerParameters? parameters = _parameters;
     bool on = _settings.equalizerOn;
     return Scaffold(
       appBar: AppBar(title: Text("Equalizer")),
@@ -167,7 +172,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
                     height: 260,
                     child: Row(
                       children: [
-                        for (AndroidEqualizerBand band in parameters.bands)
+                        for (EqBand band in parameters.bands)
                           Expanded(
                             child: Column(
                               children: [
@@ -178,14 +183,14 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
                                     quarterTurns: 3,
                                     child: Slider(
                                       value: _gains[band.index],
-                                      min: parameters.minDecibels,
-                                      max: parameters.maxDecibels,
+                                      min: parameters.minDb,
+                                      max: parameters.maxDb,
                                       onChanged: on ? (gain) => _setBand(band, gain) : null,
                                       onChangeEnd: on ? (gain) => _setBand(band, gain, save: true) : null,
                                     ),
                                   ),
                                 ),
-                                Text(_frequency(band.centerFrequency), style: TextStyle(fontSize: 11)),
+                                Text(_frequency(band.hertz), style: TextStyle(fontSize: 11)),
                               ],
                             ),
                           ),

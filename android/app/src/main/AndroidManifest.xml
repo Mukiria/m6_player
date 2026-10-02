@@ -68,6 +68,12 @@
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </receiver>
+        <!-- Cover images for Android Auto (CoverProvider.java): read-only, covers folder only -->
+        <provider
+            android:name=".CoverProvider"
+            android:authorities="com.msixv.com.m6player.covers"
+            android:exported="true"
+            android:grantUriPermissions="false" />
         <!-- Android Auto: this is a media app (see res/xml/automotive_app_desc.xml and CarBrowser) -->
         <meta-data
             android:name="com.google.android.gms.car.application"

@@ -73,6 +73,9 @@ public class MainActivity extends AudioServiceActivity {
                             result.notImplemented();
                     }
                 });
+        // The equalizer is attached by this app, not just_audio's pipeline (see EqualizerBridge)
+        new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), "com.msixv.com.m6player/equalizer")
+                .setMethodCallHandler(new EqualizerBridge());
         WifiDirect wifiDirect = new WifiDirect(this);
         new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), WIFI_DIRECT)
                 .setMethodCallHandler(wifiDirect);

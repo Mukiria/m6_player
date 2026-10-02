@@ -14,7 +14,10 @@ import 'logo_animation_data.dart';
 class AppLogo extends StatefulWidget {
   final double height;
 
-  const AppLogo({super.key, this.height = 40});
+  /// Animate whether or not anything is playing (the first-run intro pages).
+  final bool alwaysAnimate;
+
+  const AppLogo({super.key, this.height = 40, this.alwaysAnimate = false});
 
   @override
   State<AppLogo> createState() => _AppLogoState();
@@ -27,7 +30,7 @@ class _AppLogoState extends State<AppLogo> with SingleTickerProviderStateMixin {
   StreamSubscription<PlayerState>? _playerState;
   bool _audioPlaying = false;
 
-  bool get _isPlaying => _audioPlaying || _service.videoPlaying.value;
+  bool get _isPlaying => widget.alwaysAnimate || _audioPlaying || _service.videoPlaying.value;
 
   @override
   void initState() {
@@ -37,6 +40,7 @@ class _AppLogoState extends State<AppLogo> with SingleTickerProviderStateMixin {
       _update();
     });
     _service.videoPlaying.addListener(_update);
+    if (widget.alwaysAnimate) WidgetsBinding.instance.addPostFrameCallback((_) => _update());
   }
 
   /// Starts the animation from the beginning when playback starts, and stops it when it ends.

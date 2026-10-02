@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'app_settings.dart';
+import 'equalizer_service.dart';
 import 'library_store.dart';
 import 'track_info.dart';
 
@@ -12,32 +13,17 @@ import 'track_info.dart';
 /// thing plays at a time and playback continues in the background.
 class PlayerService {
   PlayerService._() {
-    _applySavedEqualizer();
+    EqualizerService.instance.start(player);
     _countPlays();
     _watchRadio();
     _crossfade();
   }
   static final PlayerService instance = PlayerService._();
 
-  /// The equalizer (Android only); see EqualizerScreen.
-  final AndroidEqualizer equalizer = AndroidEqualizer();
-
-  late final AudioPlayer player = AudioPlayer(audioPipeline: AudioPipeline(androidAudioEffects: [equalizer]));
-
-  /// Turns the equalizer on or off as saved, and restores the saved band gains
-  /// once Android makes the equalizer available (after something first plays).
-  void _applySavedEqualizer() {
-    AppSettings settings = AppSettings.instance;
-    equalizer.setEnabled(settings.equalizerOn);
-    equalizer.parameters.then((parameters) {
-      List<double> gains = settings.equalizerGains;
-      for (AndroidEqualizerBand band in parameters.bands) {
-        if (band.index < gains.length) {
-          band.setGain(gains[band.index].clamp(parameters.minDecibels, parameters.maxDecibels));
-        }
-      }
-    });
-  }
+  /// The equalizer is attached by [EqualizerService], not through just_audio's
+  /// audio pipeline: that asked for the equalizer before Android had given the
+  /// player its audio session, which stopped playback working after a fresh start.
+  late final AudioPlayer player = AudioPlayer();
 
   /// Counts a song as played once it has played for 30 seconds (or half of a
   /// short one), and again each time it repeats. Feeds the smart playlists.
