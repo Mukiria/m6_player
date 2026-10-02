@@ -100,17 +100,21 @@ void main() {
       ),
     ));
     await tester.tap(find.text('open intro'));
-    await tester.pump(Duration(milliseconds: 500)); // The animated logo never settles
+    await tester.pump(); // The tap starts the change; the next frame runs it
+    await tester.pump(Duration(milliseconds: 500)); // The animated logo never settles, so no pumpAndSettle
 
     expect(find.text('Music, videos and radio'), findsOneWidget);
     for (int i = 0; i < 3; i++) {
       await tester.tap(find.text('Next'));
-      await tester.pump(Duration(milliseconds: 500)); // The animated logo never settles
+      await tester.pump();
+      await tester.pump(Duration(milliseconds: 500)); // The animated logo never settles, so no pumpAndSettle
     }
     expect(find.text('Permissions'), findsOneWidget);
 
     await tester.tap(find.text('Get started'));
-    await tester.pump(Duration(milliseconds: 500)); // The animated logo never settles
+    await tester.pump(); // Saves the flag, then closes the page
+    await tester.pump(); // The page starts to slide away
+    await tester.pump(Duration(milliseconds: 500)); // Finished sliding
     expect(find.text('open intro'), findsOneWidget); // Back where we started
   });
 
