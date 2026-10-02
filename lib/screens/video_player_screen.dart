@@ -28,6 +28,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   VideoPlayerController? _controller;
   late int _index;
+  late List<AssetEntity> _queue; // What next/previous walk through
+  final ScrollController _carouselScroll = ScrollController();
+  static const double _carouselItemWidth = 136;
   bool _failed = false;
   bool _showControls = true;
   bool _isLandscape = false;
@@ -38,7 +41,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late AssetEntity _video;
 
   /// True when there's a video to go to after this one (up next, or later in the list).
-  bool get _hasNext => VideoLibrary.instance.upNext.isNotEmpty || _index < widget.videos.length - 1;
+  bool get _hasNext => VideoLibrary.instance.upNext.isNotEmpty || _index < _queue.length - 1;
 
   /// Next video: the up-next queue (Play next / Play last) comes first, then the list.
   void _goNext() {
@@ -47,7 +50,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _video = queued;
     } else {
       _index++;
-      _video = widget.videos[_index];
+      _video = _queue[_index];
     }
     _open();
   }
@@ -55,12 +58,72 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
+    _queue = widget.videos;
     _index = widget.index;
-    _video = widget.videos[_index];
+    _video = _queue[_index];
     // Music and video shouldn't play over each other.
     PlayerService.instance.player.pause();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     _open();
+  }
+
+  /// The videos in the playing video's folder (null when the phone gives no folder or it holds just one).
+  List<AssetEntity>? get _folderVideos {
+    String? folder = _video.relativePath;
+    if (folder == null || folder.isEmpty) return null;
+    List<AssetEntity> videos = VideoLibrary.instance.videos.where((v) => v.relativePath == folder).toList();
+    return videos.length > 1 ? videos : null;
+  }
+
+  /// Plays a video picked from the carousel; the folder becomes the queue if the list lacked it.
+  void _playFromFolder(List<AssetEntity> folder, AssetEntity video) {
+    if (video.id == _video.id) return;
+    int inQueue = _queue.indexWhere((v) => v.id == video.id);
+    if (inQueue >= 0) {
+      _index = inQueue;
+    } else {
+      _queue = folder;
+      _index = folder.indexWhere((v) => v.id == video.id);
+    }
+    _video = video;
+    _open();
+  }
+
+  Widget _carousel(List<AssetEntity> folder) {
+    int current = folder.indexWhere((v) => v.id == _video.id);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_carouselScroll.hasClients || current < 0) return;
+      double viewport = _carouselScroll.position.viewportDimension;
+      double target = current * _carouselItemWidth - (viewport - _carouselItemWidth) / 2;
+      _carouselScroll.animateTo(target.clamp(0.0, _carouselScroll.position.maxScrollExtent),
+          duration: Duration(milliseconds: 250), curve: Curves.easeOut);
+    });
+    return SizedBox(
+      height: 96,
+      child: ListView.builder(
+        controller: _carouselScroll,
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.symmetric(horizontal: 8),
+        itemExtent: _carouselItemWidth,
+        itemCount: folder.length,
+        itemBuilder: (context, i) {
+          bool selected = i == current;
+          return GestureDetector(
+            onTap: () => _playFromFolder(folder, folder[i]),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: selected ? Colors.white : Colors.transparent, width: 2),
+                ),
+                child: VideoThumbnail(key: ValueKey(folder[i].id), video: folder[i], width: _carouselItemWidth, height: 88),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _open() async {
@@ -153,6 +216,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   void dispose() {
     PlayerService.instance.videoPlaying.value = false;
     _hideTimer?.cancel();
+    _carouselScroll.dispose();
     _controller?.dispose();
     SystemChrome.setPreferredOrientations([]); // Back to the app's normal rotation
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -163,10 +227,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Widget build(BuildContext context) {
     VideoPlayerController? controller = _controller;
     bool ready = controller != null && controller.value.isInitialized;
+    bool landscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    List<AssetEntity>? folder = landscape ? null : _folderVideos; // Full screen when sideways
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: GestureDetector(
+    Widget player = GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: _toggleControls,
         onDoubleTapDown: (details) {
@@ -187,7 +251,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             if (_showControls || _failed) _controls(controller, ready),
           ],
         ),
-      ),
+      );
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: folder == null
+          ? player
+          : Column(
+              children: [
+                Expanded(child: player),
+                SafeArea(top: false, child: _carousel(folder)),
+              ],
+            ),
     );
   }
 
@@ -236,7 +311,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   onPressed: _index > 0
                       ? () {
                           _index--;
-                          _video = widget.videos[_index];
+                          _video = _queue[_index];
                           _open();
                         }
                       : null,
