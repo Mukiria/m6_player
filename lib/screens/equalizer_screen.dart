@@ -67,6 +67,40 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
     return hertz >= 1000 ? "${(hertz / 1000).toStringAsFixed(hertz >= 10000 ? 0 : 1)} kHz" : "${hertz.round()} Hz";
   }
 
+  /// Crossfade length between songs. Works whether or not the equalizer is available yet.
+  Widget _crossfadeSection(ColorScheme colors) {
+    int seconds = _settings.crossfadeSeconds;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text("Crossfade", style: TextStyle(fontWeight: FontWeight.w600))),
+              Text(seconds == 0 ? "Off" : "$seconds s", style: TextStyle(color: colors.primary)),
+            ],
+          ),
+          Slider(
+            value: seconds.toDouble(),
+            max: 12,
+            divisions: 12,
+            label: seconds == 0 ? "Off" : "$seconds s",
+            onChanged: (value) async {
+              await _settings.setCrossfadeSeconds(value.round());
+              if (mounted) setState(() {});
+            },
+          ),
+          Text(
+            "Fades a song out at its end and the next one in. Songs only (not radio). "
+            "It dips through quiet rather than overlapping the two songs.",
+            style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     ColorScheme colors = Theme.of(context).colorScheme;
@@ -75,25 +109,31 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
     return Scaffold(
       appBar: AppBar(title: Text("Equalizer")),
       body: parameters == null
-          ? Center(
-              child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.equalizer, size: 64, color: colors.onSurfaceVariant),
-                    SizedBox(height: 16),
-                    Text(
-                      "Play a song or a radio station, then come back here to adjust the equalizer.",
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+          ? ListView(
+              children: [
+                _crossfadeSection(colors),
+                Divider(),
+                Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.equalizer, size: 64, color: colors.onSurfaceVariant),
+                      SizedBox(height: 16),
+                      Text(
+                        "Play a song or a radio station, then come back here to adjust the equalizer.",
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             )
           : ListView(
               padding: EdgeInsets.symmetric(vertical: 8),
               children: [
+                _crossfadeSection(colors),
+                Divider(),
                 SwitchListTile(
                   title: Text("Equalizer"),
                   subtitle: Text(on ? "On · ${_settings.equalizerPreset}" : "Off"),

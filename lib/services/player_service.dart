@@ -15,6 +15,7 @@ class PlayerService {
     _applySavedEqualizer();
     _countPlays();
     _watchRadio();
+    _crossfade();
   }
   static final PlayerService instance = PlayerService._();
 
@@ -54,6 +55,42 @@ class PlayerService {
       if (counted != path && position >= needed) {
         counted = path;
         LibraryStore.instance().then((store) => store.recordPlay(songKey(File(path))));
+      }
+    });
+  }
+
+  /// Crossfade: the end of a song fades out and the next one fades in, over the
+  /// length chosen on the Equalizer page. The player can only play one song at a
+  /// time, so this is a dip through quiet rather than two songs overlapping.
+  /// It's done by moving the volume as the position changes (songs only; radio
+  /// and the first/last song's outer edges are left alone).
+  double _fadeVolume = 1.0;
+
+  /// The volume factor (0..1) for a point in a song, given the fade length.
+  /// [fadeOut] is false for the last song of a list that doesn't repeat.
+  static double fadeFactor(Duration position, Duration? length, int fadeSeconds, {required bool fadeOut}) {
+    if (fadeSeconds <= 0 || length == null || length < Duration(seconds: 1)) return 1.0;
+    double fade = fadeSeconds * 1000.0;
+    // Songs too short for both fades get shorter ones
+    fade = fade.clamp(1.0, length.inMilliseconds / 2.5);
+    double p = position.inMilliseconds.toDouble();
+    double fadeIn = (p / fade).clamp(0.0, 1.0);
+    double out = fadeOut ? ((length.inMilliseconds - p) / fade).clamp(0.0, 1.0) : 1.0;
+    return fadeIn < out ? fadeIn : out;
+  }
+
+  void _crossfade() {
+    player.positionStream.listen((position) {
+      int seconds = AppSettings.instance.crossfadeSeconds;
+      double target = 1.0;
+      if (isLibraryActive && seconds > 0) {
+        bool fadeOut = player.loopMode == LoopMode.all || (player.loopMode == LoopMode.off && player.hasNext);
+        target = fadeFactor(position, player.duration, seconds, fadeOut: fadeOut);
+      }
+      // Small steps are skipped; the end points are always set exactly
+      if ((target - _fadeVolume).abs() >= 0.03 || (target != _fadeVolume && (target == 1.0 || target == 0.0))) {
+        _fadeVolume = target;
+        player.setVolume(target);
       }
     });
   }

@@ -65,6 +65,25 @@ void main() {
     expect(find.text('New playlist'), findsOneWidget);
   });
 
+  testWidgets('a wide screen puts the tabs in a side rail; a narrow one keeps the bottom bar', (tester) async {
+    await tester.pumpWidget(app()); // The test window is 800 wide
+    await tester.pump(Duration(milliseconds: 100));
+    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+
+    tester.view.physicalSize = Size(400, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pump(Duration(milliseconds: 100));
+    expect(find.byType(NavigationRail), findsNothing);
+    expect(find.byType(NavigationBar), findsOneWidget);
+
+    await tester.tap(find.text('Radio')); // Switching tabs works from the bottom bar too
+    await tester.pump(Duration(milliseconds: 100));
+    expect(find.text('Search stations'), findsOneWidget);
+  });
+
   testWidgets('the intro pages step through and close', (tester) async {
     await tester.pumpWidget(MaterialApp(
       theme: lightTheme(),

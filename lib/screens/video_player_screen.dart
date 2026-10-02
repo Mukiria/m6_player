@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:audio_session/audio_session.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:video_player/video_player.dart';
@@ -12,6 +15,7 @@ import '../services/player_service.dart';
 import '../services/video_library.dart';
 import '../theme.dart';
 import '../utils/format.dart';
+import '../widgets/options_sheet.dart';
 import '../widgets/video_list.dart';
 
 /// Full-screen video player. Tap to show or hide the controls; double-tap the
@@ -43,6 +47,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   double _speed = 1.0; // Kept from one video to the next
   int _shape = 0; // Index into _shapes; kept from one video to the next
   static const List<String> _shapes = ["Fit", "Fill", "16:9", "4:3"];
+  bool _hasSubtitles = false; // A subtitle file is loaded for this video
+  bool _subtitlesOn = true;
   bool _locked = false; // Touch lock: only the unlock button responds
   bool _boosting = false; // Holding a finger down plays at 2x
   Timer? _hideTimer;
@@ -201,6 +207,118 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _scheduleHide();
   }
 
+  // ------------------------------------------------------------ Subtitles
+
+  /// Where this video's subtitle file is kept (a copy of the one the user picked).
+  Future<Directory> _subtitleDir() async =>
+      Directory('${(await getApplicationDocumentsDirectory()).path}/subtitles').create(recursive: true);
+
+  Future<List<File>> _savedSubtitleFiles() async {
+    Directory dir = await _subtitleDir();
+    return [for (String ext in ['srt', 'vtt']) File('${dir.path}/${_video.id}.$ext')].where((f) => f.existsSync()).toList();
+  }
+
+  /// Loads the subtitles saved for this video, if it has any.
+  Future<void> _loadSavedSubtitles(VideoPlayerController controller) async {
+    try {
+      List<File> saved = await _savedSubtitleFiles();
+      if (saved.isNotEmpty) await _applySubtitles(controller, saved.first);
+    } catch (e) {
+      debugPrint("Error loading subtitles: $e");
+    }
+  }
+
+  Future<void> _applySubtitles(VideoPlayerController controller, File file) async {
+    List<int> bytes = await file.readAsBytes();
+    String text;
+    try {
+      text = utf8.decode(bytes);
+    } on FormatException {
+      text = latin1.decode(bytes); // Older subtitle files are often not UTF-8
+    }
+    ClosedCaptionFile captions =
+        file.path.endsWith('.vtt') ? WebVTTCaptionFile(text) : SubRipCaptionFile(text);
+    await controller.setClosedCaptionFile(Future.value(captions));
+    if (mounted) setState(() => _hasSubtitles = true);
+  }
+
+  /// Picks a .srt or .vtt file from the phone and keeps a copy for this video.
+  Future<void> _pickSubtitles() async {
+    VideoPlayerController? controller = _controller;
+    if (controller == null) return;
+    try {
+      List<PlatformFile> picked = await FilePicker.pickFiles(type: FileType.any);
+      String? path = picked.isEmpty ? null : picked.first.path;
+      if (path == null) return;
+      String ext = path.toLowerCase().endsWith('.vtt') ? 'vtt' : (path.toLowerCase().endsWith('.srt') ? 'srt' : '');
+      if (ext.isEmpty) {
+        _showGesture(Icons.error_outline, "Choose a .srt or .vtt file");
+        return;
+      }
+      for (File old in await _savedSubtitleFiles()) {
+        await old.delete();
+      }
+      File saved = await File(path).copy('${(await _subtitleDir()).path}/${_video.id}.$ext');
+      await _applySubtitles(controller, saved);
+      setState(() => _subtitlesOn = true);
+      _showGesture(Icons.subtitles, "Subtitles loaded");
+    } catch (e) {
+      debugPrint("Error loading a subtitle file: $e");
+      _showGesture(Icons.error_outline, "Couldn't read that file");
+    }
+  }
+
+  Future<void> _removeSubtitles() async {
+    for (File old in await _savedSubtitleFiles()) {
+      await old.delete();
+    }
+    await _controller?.setClosedCaptionFile(null);
+    if (mounted) setState(() => _hasSubtitles = false);
+  }
+
+  /// Subtitles and audio track choices.
+  Future<void> _showSubtitleMenu() async {
+    _hideTimer?.cancel();
+    VideoPlayerController? controller = _controller;
+    List<VideoAudioTrack> tracks = [];
+    try {
+      if (controller != null && controller.isAudioTrackSupportAvailable()) tracks = await controller.getAudioTracks();
+    } catch (e) {
+      debugPrint("Error reading audio tracks: $e");
+    }
+    if (!mounted) return;
+    await showOptionsSheet(
+      context,
+      title: "Subtitles and audio",
+      options: [
+        SheetOption(icon: Icons.upload_file, label: "Load a subtitle file (.srt, .vtt)…", onTap: _pickSubtitles),
+        if (_hasSubtitles)
+          SheetOption(
+            icon: _subtitlesOn ? Icons.subtitles_off_outlined : Icons.subtitles_outlined,
+            label: _subtitlesOn ? "Turn subtitles off" : "Turn subtitles on",
+            onTap: () => setState(() => _subtitlesOn = !_subtitlesOn),
+          ),
+        if (_hasSubtitles) SheetOption(icon: Icons.delete_outline, label: "Remove subtitles", onTap: _removeSubtitles),
+        if (tracks.length > 1)
+          for (VideoAudioTrack track in tracks)
+            SheetOption(
+              icon: track.isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+              label: "Audio: ${_trackName(track, tracks.indexOf(track))}",
+              onTap: () => controller?.selectAudioTrack(track.id),
+            ),
+      ],
+    );
+    _scheduleHide();
+  }
+
+  String _trackName(VideoAudioTrack track, int index) {
+    String? label = track.label?.trim();
+    if (label != null && label.isNotEmpty) return label;
+    String? language = track.language;
+    if (language != null && language.isNotEmpty && language != 'und') return language;
+    return "Track ${index + 1}";
+  }
+
   void _boostStart() {
     if (_controller == null) return;
     _boosting = true;
@@ -324,6 +442,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   Future<void> _open() async {
     _savePosition();
+    _hasSubtitles = false;
     VideoPlayerController? old = _controller;
     String key = videoKey(_video.id);
     setState(() {
@@ -350,6 +469,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _loadedKey = key;
       _lastSaved = resumeAt ?? Duration.zero;
       await controller.setPlaybackSpeed(_speed);
+      await _loadSavedSubtitles(controller);
       controller.addListener(_onTick);
       setState(() => _controller = controller);
       await controller.play();
@@ -483,6 +603,19 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       ? _videoView(controller)
                       : CircularProgressIndicator(color: brandBlueLight),
             ),
+            if (_hasSubtitles && _subtitlesOn && ready && controller.value.caption.text.isNotEmpty)
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(24, 0, 24, _showControls ? 96 : 32),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(6)),
+                    child: Text(controller.value.caption.text,
+                        textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 16)),
+                  ),
+                ),
+              ),
             if (_locked && _showControls)
               SafeArea(
                 child: Align(
@@ -565,6 +698,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 Expanded(
                   child: Text(videoTitle(_video), maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500)),
+                ),
+                IconButton(
+                  tooltip: "Subtitles and audio",
+                  icon: Icon(Icons.subtitles_outlined, color: _hasSubtitles && _subtitlesOn ? brandBlueLight : Colors.white),
+                  onPressed: ready ? _showSubtitleMenu : null,
                 ),
                 IconButton(
                   tooltip: "Lock touch",

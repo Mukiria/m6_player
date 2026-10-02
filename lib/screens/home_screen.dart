@@ -32,18 +32,68 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  /// Both tabs stay alive, so the radio list and the library aren't reloaded on
+  /// every switch (or when the phone turns between portrait and landscape).
+  final GlobalKey _tabsKey = GlobalKey();
+
+  static const List<(IconData, IconData, String)> _destinations = [
+    (Icons.music_note_outlined, Icons.music_note, 'Music'),
+    (Icons.radio_outlined, Icons.radio, 'Radio'),
+    (Icons.video_library_outlined, Icons.video_library, 'Video'),
+  ];
+
   @override
   Widget build(BuildContext context) {
+    Widget tabs = IndexedStack(
+      key: _tabsKey,
+      index: _tab,
+      children: [
+        const MusicPlayerScreen(),
+        const RadioScreen(),
+        VideoScreen(isVisible: _tab == 2),
+      ],
+    );
+
+    // Tablets and phones on their side: the tabs go down the left edge, which
+    // leaves the full height for the lists, and the mini player sits under the content.
+    if (MediaQuery.sizeOf(context).width >= 600) {
+      return Scaffold(
+        // The tabs' own app bars cover the top; the rail covers the left (a notch on a phone on its side).
+        body: SafeArea(
+          top: false,
+          left: false,
+          child: Row(
+            children: [
+              SafeArea(
+                right: false,
+                bottom: false,
+                child: NavigationRail(
+                  selectedIndex: _tab,
+                  onDestinationSelected: (index) => setState(() => _tab = index),
+                  labelType: NavigationRailLabelType.all,
+                  destinations: [
+                    for (var (icon, selectedIcon, label) in _destinations)
+                      NavigationRailDestination(icon: Icon(icon), selectedIcon: Icon(selectedIcon), label: Text(label)),
+                  ],
+                ),
+              ),
+              VerticalDivider(width: 1),
+              Expanded(
+                child: Column(
+                  children: [
+                    Expanded(child: tabs),
+                    const MiniPlayer(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
-      // Both tabs stay alive, so the radio list and the library aren't reloaded on every switch.
-      body: IndexedStack(
-        index: _tab,
-        children: [
-          const MusicPlayerScreen(),
-          const RadioScreen(),
-          VideoScreen(isVisible: _tab == 2),
-        ],
-      ),
+      body: tabs,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -51,22 +101,9 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationBar(
             selectedIndex: _tab,
             onDestinationSelected: (index) => setState(() => _tab = index),
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.music_note_outlined),
-                selectedIcon: Icon(Icons.music_note),
-                label: 'Music',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.radio_outlined),
-                selectedIcon: Icon(Icons.radio),
-                label: 'Radio',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.video_library_outlined),
-                selectedIcon: Icon(Icons.video_library),
-                label: 'Video',
-              ),
+            destinations: [
+              for (var (icon, selectedIcon, label) in _destinations)
+                NavigationDestination(icon: Icon(icon), selectedIcon: Icon(selectedIcon), label: label),
             ],
           ),
         ],

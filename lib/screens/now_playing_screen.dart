@@ -168,23 +168,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     // Position can briefly exceed duration at the end of a track.
     Duration shown = _dragPosition ?? (_position > _duration ? _duration : _position);
 
-    return Theme(
-      data: darkTheme(),
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [brandNavyRaised, brandNavy, Colors.black],
-            ),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                children: [
+    // The screen's parts, so portrait can stack them and landscape can put them side by side
+    final List<Widget> topBar = [
                   // Top bar: close and the up-next list
                   Row(
                     children: [
@@ -202,6 +187,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                         ),
                     ],
                   ),
+    ];
+    final List<Widget> titleBlock = [
                   SizedBox(height: 8),
                   Text(
                     item?.title ?? '',
@@ -220,7 +207,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(color: isRadio && reconnecting ? accent : muted, fontSize: 14)),
                   ),
-                  Expanded(
+    ];
+    final Widget art = Expanded(
                     child: _showLyrics && _currentSong != null
                         ? FutureBuilder<String?>(
                             future: TrackInfoService.instance.lyricsFor(_currentSong!),
@@ -236,7 +224,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                             },
                           )
                         : _cover(item, isRadio),
-                  ),
+                  );
+    final List<Widget> controls = [
 
                   // Favourite, add to playlist (songs only) and the sleep timer
                   Wrap(
@@ -376,8 +365,39 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                     ],
                   ),
                   SizedBox(height: 32),
-                ],
-              ),
+    ];
+    bool landscape = MediaQuery.sizeOf(context).width > MediaQuery.sizeOf(context).height;
+
+    return Theme(
+      data: darkTheme(),
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [brandNavyRaised, brandNavy, Colors.black],
+            ),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: landscape
+                  // Cover on the left; title, buttons and seek bar on the right (scrolls on a short screen)
+                  ? Row(
+                      children: [
+                        Expanded(flex: 4, child: Column(children: [...topBar, art])), // art is already an Expanded
+                        SizedBox(width: 24),
+                        Expanded(
+                          flex: 5,
+                          child: SingleChildScrollView(
+                            child: Column(children: [SizedBox(height: 16), ...titleBlock, SizedBox(height: 8), ...controls]),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Column(children: [...topBar, ...titleBlock, art, ...controls]),
             ),
           ),
         ),

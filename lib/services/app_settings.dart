@@ -17,6 +17,7 @@ class AppSettings extends ChangeNotifier {
   bool _equalizerOn = false;
   String _equalizerPreset = 'Flat';
   List<double> _equalizerGains = []; // dB per band, lowest frequency first
+  int _crossfadeSeconds = 0; // Fade length between songs; 0 is off
   bool _onboarded = false; // The first-run pages have been seen
   String? _radioCountry; // ISO code chosen in Radio; null follows the phone's region
   String? _pinSalt; // The Hidden page's PIN is kept only as a salted hash
@@ -25,6 +26,7 @@ class AppSettings extends ChangeNotifier {
   ThemeMode get themeMode => _themeMode;
   bool get equalizerOn => _equalizerOn;
   String get equalizerPreset => _equalizerPreset;
+  int get crossfadeSeconds => _crossfadeSeconds;
   bool get onboarded => _onboarded;
   String? get radioCountry => _radioCountry;
   bool get hasPin => _pinHash != null;
@@ -40,6 +42,7 @@ class AppSettings extends ChangeNotifier {
       _equalizerOn = json['equalizerOn'] == true;
       _equalizerPreset = json['equalizerPreset'] as String? ?? 'Flat';
       _equalizerGains = (json['equalizerGains'] as List? ?? []).map((g) => (g as num).toDouble()).toList();
+      _crossfadeSeconds = ((json['crossfadeSeconds'] as num?)?.toInt() ?? 0).clamp(0, 12);
       _onboarded = json['onboarded'] == true;
       _radioCountry = json['radioCountry'] as String?;
       _pinSalt = json['pinSalt'] as String?;
@@ -60,6 +63,7 @@ class AppSettings extends ChangeNotifier {
         'equalizerOn': _equalizerOn,
         'equalizerPreset': _equalizerPreset,
         'equalizerGains': _equalizerGains,
+        'crossfadeSeconds': _crossfadeSeconds,
         'onboarded': _onboarded,
         'radioCountry': _radioCountry,
         'pinSalt': _pinSalt,
@@ -88,6 +92,11 @@ class AppSettings extends ChangeNotifier {
       _pinSalt = List.generate(16, (_) => Random.secure().nextInt(256).toRadixString(16)).join();
       _pinHash = _hash(_pinSalt!, pin);
     }
+    await _save();
+  }
+
+  Future<void> setCrossfadeSeconds(int seconds) async {
+    _crossfadeSeconds = seconds.clamp(0, 12);
     await _save();
   }
 
