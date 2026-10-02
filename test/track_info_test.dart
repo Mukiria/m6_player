@@ -72,4 +72,19 @@ void main() {
     expect(info.title, 'Fallback');
     expect(info.subtitle, 'Sauti Sol');
   });
+
+  group('cleanLyrics', () {
+    test('removes LRC time stamps and header lines', () {
+      expect(
+        cleanLyrics('[ar:Sauti Sol]\n[00:12.34]First line\n[00:20.00]Second line'),
+        'First line\nSecond line',
+      );
+    });
+
+    test('keeps plain lyrics and treats blank as none', () {
+      expect(cleanLyrics('  Just words\nmore words  '), 'Just words\nmore words');
+      expect(cleanLyrics('   '), isNull);
+      expect(cleanLyrics(null), isNull);
+    });
+  });
 }

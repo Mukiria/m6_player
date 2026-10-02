@@ -13,8 +13,9 @@ class TrackInfo {
   final String? album;
   final String? coverPath;
   final Duration? duration; // From the file's audio frames, when readable
+  final String? genre; // The first genre tag
 
-  const TrackInfo({required this.title, this.artist, this.album, this.coverPath, this.duration});
+  const TrackInfo({required this.title, this.artist, this.album, this.coverPath, this.duration, this.genre});
 
   /// Artist (and album when known) for the line under the title.
   String get subtitle => songSubtitle(artist, album);
@@ -43,6 +44,17 @@ class TrackInfoService {
     }
   }
 
+  /// Writes new tags into the song's file (the library's own copy, never the
+  /// original) and re-reads them. A blank artist, album or genre removes that tag.
+  /// False if the file couldn't be written.
+  Future<bool> editTags(File file, {required String title, String? artist, String? album, String? genre}) async {
+    bool written = await compute(_writeTags, (file.path, title, artist, album, genre));
+    if (!written) return false;
+    _cache.remove(file.path);
+    await load([file]);
+    return true;
+  }
+
   /// Forgets a removed song and deletes its saved cover.
   Future<void> forget(File file) async {
     TrackInfo? info = _cache.remove(file.path);
@@ -50,10 +62,56 @@ class TrackInfoService {
     if (cover != null && await File(cover).exists()) await File(cover).delete();
   }
 
+  final Map<String, Future<String?>> _lyrics = {};
+
+  /// The song's embedded lyrics (plain text, or LRC with its time stamps removed), or null.
+  /// Read once, in a background isolate, then remembered.
+  Future<String?> lyricsFor(File file) => _lyrics.putIfAbsent(file.path, () => compute(_readLyrics, file.path));
+
   Future<Directory> _covers() async {
     return _coverDir ??= await Directory('${(await getApplicationDocumentsDirectory()).path}/covers')
         .create(recursive: true);
   }
+}
+
+/// Runs in a background isolate: writes the tags of one file.
+bool _writeTags((String, String, String?, String?, String?) job) {
+  final (String path, String title, String? artist, String? album, String? genre) = job;
+  try {
+    updateMetadata(File(path), (tags) {
+      tags.setTitle(title);
+      tags.setArtist(artist);
+      tags.setAlbum(album);
+      tags.setGenres(genre == null ? [] : [genre]);
+    });
+    // Some files have no tag block to write into: check the change took.
+    return readMetadata(File(path), getImage: false).title == title;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Runs in a background isolate: the lyrics tag of one file.
+String? _readLyrics(String path) {
+  try {
+    String? text = readMetadata(File(path), getImage: false).lyrics;
+    return cleanLyrics(text);
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Lyrics ready to show: LRC time stamps like "[01:23.45]" removed (and its
+/// "[ar:...]" header lines), blank ends trimmed. Null when nothing is left.
+String? cleanLyrics(String? text) {
+  if (text == null) return null;
+  String cleaned = text
+      .replaceAll('\u0000', '')
+      .replaceAll(RegExp(r'^\[[a-zA-Z]+:[^\]]*\]\s*$', multiLine: true), '')
+      .replaceAll(RegExp(r'\[\d{1,3}:\d{2}(?:[.:]\d{1,3})?\]'), '')
+      .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+      .trim();
+  return cleaned.isEmpty ? null : cleaned;
 }
 
 /// Runs in a background isolate: reads the tags of every path.
@@ -91,10 +149,24 @@ TrackInfo readTrackInfo(File file, String coverDir) {
       album: _clean(tags.album),
       coverPath: coverPath,
       duration: tags.duration,
+      genre: _firstGenre(tags),
     );
   } catch (_) {
     return TrackInfo(title: fallbackTitle, coverPath: existingCover);
   }
+}
+
+/// The song's first genre, or null. Old ID3v1 tags give a bare number or "(13)": skipped.
+String? _firstGenre(AudioMetadata tags) {
+  try {
+    for (String genre in tags.genres) {
+      String? clean = _clean(genre);
+      if (clean != null && !RegExp(r'^\(?\d+\)?$').hasMatch(clean)) return clean;
+    }
+  } catch (_) {
+    // genres is unset when the file has no genre tag
+  }
+  return null;
 }
 
 /// Trims a tag, treating blank text as missing.

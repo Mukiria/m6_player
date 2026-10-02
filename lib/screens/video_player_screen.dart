@@ -294,7 +294,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             itemCount: folder.length,
             itemBuilder: (context, i) {
               bool selected = i == current;
-              return GestureDetector(
+              return Semantics(
+                button: true,
+                selected: selected,
+                label: "${videoTitle(folder[i])}, ${formatDuration(folder[i].videoDuration)}${selected ? ", playing" : ""}",
+                child: ExcludeSemantics(
+                  child: GestureDetector(
                 onTap: () => _playFromFolder(folder, folder[i]),
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
@@ -306,6 +311,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     child: VideoThumbnail(
                         key: ValueKey(folder[i].id), video: folder[i], width: thumbWidth - 4, height: thumbHeight - 4),
                   ),
+                ),
+              ),
                 ),
               );
             },
@@ -649,6 +656,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   Text(formatDuration(position), style: TextStyle(color: Colors.white, fontSize: 12)),
                   Expanded(
                     child: Slider(
+                      semanticFormatterCallback: (value) =>
+                          "${formatDuration(Duration(milliseconds: value.round()))} of ${formatDuration(duration)}",
                       value: position.inMilliseconds.toDouble(),
                       max: duration.inMilliseconds.toDouble().clamp(1.0, double.infinity),
                       activeColor: brandBlueLight,
@@ -667,12 +676,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     ),
                   ),
                   Text(formatDuration(duration), style: TextStyle(color: Colors.white, fontSize: 12)),
-                  InkWell(
-                    onTap: ready ? _nextShape : null,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                      child: Icon(Icons.aspect_ratio, color: Colors.white, size: 20),
-                    ),
+                  IconButton(
+                    tooltip: "Picture shape: ${_shapes[_shape]}",
+                    icon: Icon(Icons.aspect_ratio, color: Colors.white),
+                    onPressed: ready ? _nextShape : null,
                   ),
                   PopupMenuButton<double>(
                     tooltip: "Playback speed",
@@ -688,10 +695,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     itemBuilder: (context) => [
                       for (double speed in _speeds) PopupMenuItem(value: speed, child: Text("${_speedLabel(speed)}x")),
                     ],
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                      child: Text("${_speedLabel(_speed)}x",
-                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minWidth: 48, minHeight: 48), // A full-size touch target
+                      child: Center(
+                        child: Text("${_speedLabel(_speed)}x",
+                            style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                      ),
                     ),
                   ),
                   IconButton(

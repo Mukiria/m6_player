@@ -5,6 +5,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:audio_service/audio_service.dart' show MediaItem;
 import '../services/library_store.dart';
 import '../services/player_service.dart';
+import '../services/track_info.dart';
 import '../theme.dart';
 import '../utils/format.dart';
 import '../widgets/artwork.dart';
@@ -32,6 +33,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
   Duration _duration = Duration.zero;
   Duration? _dragPosition; // While the user drags the seek bar
   LibraryStore? _store;
+  bool _showLyrics = false; // Lyrics instead of the cover (when the song has them)
   Timer? _clock; // Redraws the sleep timer's minutes left
 
   @override
@@ -78,6 +80,16 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     _clock?.cancel();
     super.dispose();
   }
+
+  Widget _cover(MediaItem? item, bool isRadio) => Center(
+        child: LayoutBuilder(
+          builder: (context, constraints) => Artwork(
+            size: (constraints.biggest.shortestSide * 0.85).clamp(120.0, 320.0),
+            isRadio: isRadio,
+            coverPath: item?.artUri?.toFilePath(),
+          ),
+        ),
+      );
 
   bool get _isFavourite {
     File? song = _currentSong;
@@ -199,26 +211,37 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                     style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w600),
                   ),
                   SizedBox(height: 4),
-                  Text(item == null ? '' : itemSubtitle(item),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: muted, fontSize: 14)),
+                  ValueListenableBuilder<bool>(
+                    valueListenable: _service.reconnecting,
+                    builder: (context, reconnecting, _) => Text(
+                        isRadio && reconnecting ? "Reconnecting…" : (item == null ? '' : itemSubtitle(item)),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: isRadio && reconnecting ? accent : muted, fontSize: 14)),
+                  ),
                   Expanded(
-                    child: Center(
-                      child: LayoutBuilder(
-                        builder: (context, constraints) => Artwork(
-                          size: (constraints.biggest.shortestSide * 0.85).clamp(120.0, 320.0),
-                          isRadio: isRadio,
-                          coverPath: item?.artUri?.toFilePath(),
-                        ),
-                      ),
-                    ),
+                    child: _showLyrics && _currentSong != null
+                        ? FutureBuilder<String?>(
+                            future: TrackInfoService.instance.lyricsFor(_currentSong!),
+                            builder: (context, snapshot) {
+                              String? lyrics = snapshot.data;
+                              if (lyrics == null) return _cover(item, isRadio);
+                              return SingleChildScrollView(
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                child: Text(lyrics,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: Colors.white, fontSize: 18, height: 1.5)),
+                              );
+                            },
+                          )
+                        : _cover(item, isRadio),
                   ),
 
                   // Favourite, add to playlist (songs only) and the sleep timer
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  Wrap(
+                    alignment: WrapAlignment.spaceEvenly,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       if (_currentSong != null) ...[
                         IconButton(
@@ -231,6 +254,17 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                           tooltip: "Add to playlist",
                           icon: Icon(Icons.playlist_add, color: Colors.white),
                           onPressed: () => showAddTo(context, key: songKey(_currentSong!), kind: MediaKind.audio),
+                        ),
+                        // Only songs that carry lyrics get the button
+                        FutureBuilder<String?>(
+                          future: TrackInfoService.instance.lyricsFor(_currentSong!),
+                          builder: (context, snapshot) => snapshot.data == null
+                              ? SizedBox.shrink()
+                              : IconButton(
+                                  tooltip: _showLyrics ? "Show the cover" : "Show lyrics",
+                                  icon: Icon(Icons.lyrics_outlined, color: _showLyrics ? accent : Colors.white),
+                                  onPressed: () => setState(() => _showLyrics = !_showLyrics),
+                                ),
                         ),
                       ],
                       if (!isRadio)
@@ -272,6 +306,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                   // Seek bar (songs only: a live stream has no length)
                   if (!isRadio) ...[
                     Slider(
+                      semanticFormatterCallback: (value) =>
+                          "${formatDuration(Duration(milliseconds: value.round()))} of ${formatDuration(_duration)}",
                       value: shown.inMilliseconds.toDouble(),
                       max: _duration.inMilliseconds.toDouble().clamp(1.0, double.infinity),
                       activeColor: accent,

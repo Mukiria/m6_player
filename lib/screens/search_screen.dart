@@ -7,6 +7,7 @@ import '../services/track_info.dart';
 import '../services/video_library.dart';
 import '../widgets/song_list.dart';
 import '../widgets/video_list.dart';
+import 'playlist_screen.dart';
 
 /// Search across the songs (title, artist, album) and videos (name) on the
 /// phone. Hidden items are left out, as they are everywhere else.
@@ -65,20 +66,26 @@ class _SearchScreenState extends State<SearchScreen> {
     }).toList();
   }
 
+  List<Playlist> get _playlistResults {
+    if (_query.isEmpty) return [];
+    return (_store?.playlists ?? []).where((p) => _matches(p.name)).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     ColorScheme colors = Theme.of(context).colorScheme;
     List<File> songs = _songResults;
     List<AssetEntity> videos = _videoResults;
+    List<Playlist> playlists = _playlistResults;
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: TextField(
             controller: _controller,
             autofocus: true,
             textInputAction: TextInputAction.search,
-            decoration: InputDecoration(hintText: "Search songs and videos", border: InputBorder.none),
+            decoration: InputDecoration(hintText: "Search songs, videos and playlists", border: InputBorder.none),
             onChanged: (text) => setState(() => _query = text.trim().toLowerCase()),
           ),
           actions: [
@@ -96,6 +103,7 @@ class _SearchScreenState extends State<SearchScreen> {
             tabs: [
               Tab(text: "Songs (${songs.length})"),
               Tab(text: "Videos (${videos.length})"),
+              Tab(text: "Playlists (${playlists.length})"),
             ],
           ),
         ),
@@ -107,6 +115,23 @@ class _SearchScreenState extends State<SearchScreen> {
                       ? _none(colors)
                       : SongList(key: ValueKey('songs:$_query'), songs: songs, queueId: 'search:$_query'),
                   videos.isEmpty ? _none(colors) : VideoList(videos: videos),
+                  playlists.isEmpty
+                      ? _none(colors)
+                      : ListView(
+                          children: [
+                            for (Playlist playlist in playlists)
+                              ListTile(
+                                leading: Icon(playlist.kind == MediaKind.audio ? Icons.queue_music : Icons.video_library_outlined),
+                                title: Text(playlist.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                subtitle: Text(
+                                    "${playlist.songs.length} ${playlist.kind == MediaKind.audio ? "songs" : "videos"}",
+                                    style: TextStyle(color: colors.onSurfaceVariant)),
+                                trailing: Icon(Icons.chevron_right),
+                                onTap: () => Navigator.of(context).push(
+                                    MaterialPageRoute(builder: (context) => PlaylistScreen(playlistId: playlist.id))),
+                              ),
+                          ],
+                        ),
                 ],
               ),
       ),

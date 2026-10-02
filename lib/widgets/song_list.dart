@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../services/library_store.dart';
+import '../services/music_library.dart';
 import '../services/player_service.dart';
 import '../services/track_info.dart';
 import 'artwork.dart';
@@ -127,6 +128,28 @@ class _SongListState extends State<SongList> {
         onAddTo: () async {
           await showAddToMany(context, keys: _selectedKeys, kind: MediaKind.audio);
           if (mounted) setState(_selected.clear);
+        },
+        onDelete: () async {
+          List<File> picked = widget.songs.where((song) => _selected.contains(song.path)).toList();
+          bool confirmed = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text("Delete ${picked.length} songs?"),
+                  content: Text("They're deleted from M6 Player and removed from your favourites and playlists. "
+                      "The original files on your device are not affected."),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(context, false), child: Text("Cancel")),
+                    TextButton(onPressed: () => Navigator.pop(context, true), child: Text("Delete")),
+                  ],
+                ),
+              ) ??
+              false;
+          if (!confirmed) return;
+          for (File song in picked) {
+            await MusicLibrary.instance.delete(song);
+          }
+          if (mounted) setState(_selected.clear);
+          _say("${picked.length} songs deleted");
         },
         onHide: () async {
           List<String> keys = _selectedKeys;

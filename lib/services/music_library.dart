@@ -25,6 +25,9 @@ class MusicLibrary extends ChangeNotifier {
   /// The library song with this file name, if it's still there.
   File? songNamed(String name) => _songs.where((file) => songKey(file) == name).firstOrNull;
 
+  /// A song's tags changed: lists redraw with the new title, artist, album or genre.
+  void tagsChanged() => notifyListeners();
+
   /// Loads the library folder, then reads the songs' tags (titles, artists, covers).
   Future<void> load() async {
     if (isLoaded) return;

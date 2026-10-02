@@ -12,7 +12,8 @@ Listenable _changes() => Listenable.merge([MusicLibrary.instance, ?LibraryStore.
 /// What the Browse tab groups songs by.
 enum BrowseBy {
   albums('Albums', 'Unknown album'),
-  artists('Artists', 'Unknown artist');
+  artists('Artists', 'Unknown artist'),
+  genres('Genres', 'No genre');
 
   final String label;
   final String unknown;
@@ -20,12 +21,17 @@ enum BrowseBy {
 
   /// The group a song belongs to.
   String groupOf(TrackInfo info) {
-    String name = ((this == albums ? info.album : info.artist) ?? '').trim();
+    String name = switch (this) {
+      albums => info.album,
+      artists => info.artist,
+      genres => info.genre,
+    } ?? '';
+    name = name.trim();
     return name.isEmpty ? unknown : name;
   }
 }
 
-/// The Music tab's Browse page: songs grouped by album or artist. Tapping a
+/// The Music tab's Browse page: songs grouped by album, artist or genre. Tapping a
 /// group opens its songs. Hidden songs are left out.
 class MusicBrowse extends StatefulWidget {
   const MusicBrowse({super.key});

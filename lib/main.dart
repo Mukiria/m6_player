@@ -19,6 +19,12 @@ Future<void> main() async {
       androidNotificationOngoing: true,
       androidNotificationIcon: 'drawable/ic_stat_m6', // White music note (the colour app icon shows as a blank square)
       notificationColor: brandBlue,
+      // Android Auto: show the browse menu as lists
+      androidBrowsableRootExtras: {
+        'android.media.browse.CONTENT_STYLE_SUPPORTED': true,
+        'android.media.browse.CONTENT_STYLE_BROWSABLE_HINT': 1,
+        'android.media.browse.CONTENT_STYLE_PLAYABLE_HINT': 1,
+      },
     ),
   );
   runApp(const MyApp());

@@ -49,6 +49,28 @@ class Playlist {
       );
 }
 
+/// One file sent or received over Wi-Fi Direct, for the transfer page's history.
+class TransferRecord {
+  final String name;
+  final bool sent; // False: received
+  final MediaKind kind;
+  final DateTime time;
+  final bool ok;
+
+  const TransferRecord({required this.name, required this.sent, required this.kind, required this.time, required this.ok});
+
+  Map<String, dynamic> toJson() =>
+      {'name': name, 'sent': sent, 'kind': kind.name, 'time': time.millisecondsSinceEpoch, 'ok': ok};
+
+  factory TransferRecord.fromJson(Map<String, dynamic> json) => TransferRecord(
+        name: json['name'] as String,
+        sent: json['sent'] == true,
+        kind: MediaKind.values.asNameMap()[json['kind']] ?? MediaKind.audio,
+        time: DateTime.fromMillisecondsSinceEpoch((json['time'] as num).toInt()),
+        ok: json['ok'] != false,
+      );
+}
+
 /// Marks a backup file as made by this app.
 const String backupMarker = 'm6player-backup';
 
@@ -90,6 +112,7 @@ class LibraryStore extends ChangeNotifier {
   final Set<String> _hidden = {}; // Hidden from every list
   final Set<String> _filteredOut = {}; // Removed from the Songs or Videos list only
   final List<RadioStation> _radioFavourites = []; // Newest first
+  final List<TransferRecord> _transfers = []; // Newest first, at most 30
   final List<RadioStation> _radioRecent = []; // Last played first
   final Map<String, (int, int)> _plays = {}; // Item key: (times played, last played in ms since epoch)
   final Map<String, int> _positions = {}; // Where each video stopped, in milliseconds
@@ -98,6 +121,7 @@ class LibraryStore extends ChangeNotifier {
   VideoSort get videoSort => _videoSort;
   List<Playlist> get playlists => List.unmodifiable(_playlists);
   List<Playlist> playlistsOf(MediaKind kind) => _playlists.where((p) => p.kind == kind).toList();
+  List<TransferRecord> get transfers => List.unmodifiable(_transfers);
   List<RadioStation> get radioRecent => List.unmodifiable(_radioRecent);
   List<RadioStation> get radioFavourites => List.unmodifiable(_radioFavourites);
   bool isRadioFavourite(String url) => _radioFavourites.any((s) => s.url == url);
@@ -154,6 +178,9 @@ class LibraryStore extends ChangeNotifier {
       List list = value as List;
       _plays[key as String] = ((list[0] as num).toInt(), (list[1] as num).toInt());
     });
+    _transfers
+      ..clear()
+      ..addAll((json['transfers'] as List? ?? []).map((t) => TransferRecord.fromJson(t as Map<String, dynamic>)));
     _positions.clear();
     (json['positions'] as Map? ?? {}).forEach((key, ms) => _positions[key as String] = (ms as num).toInt());
   }
@@ -169,6 +196,7 @@ class LibraryStore extends ChangeNotifier {
         'radioFavourites': _radioFavourites.map((s) => {'name': s.name, 'url': s.url, 'country': s.country}).toList(),
         'radioRecent': _radioRecent.map((s) => {'name': s.name, 'url': s.url, 'country': s.country}).toList(),
         'plays': {for (MapEntry<String, (int, int)> e in _plays.entries) e.key: [e.value.$1, e.value.$2]},
+        'transfers': _transfers.map((t) => t.toJson()).toList(),
         'positions': _positions,
       };
 
@@ -244,6 +272,17 @@ class LibraryStore extends ChangeNotifier {
 
   Future<void> setVideoSort(VideoSort sort) async {
     _videoSort = sort;
+    await _changed();
+  }
+
+  Future<void> addTransfer(TransferRecord record) async {
+    _transfers.insert(0, record);
+    if (_transfers.length > 30) _transfers.removeRange(30, _transfers.length);
+    await _changed();
+  }
+
+  Future<void> clearTransfers() async {
+    _transfers.clear();
     await _changed();
   }
 

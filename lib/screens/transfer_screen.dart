@@ -49,20 +49,40 @@ class _TransferScreenState extends State<TransferScreen> {
   bool _transferring = false;
   double? _progress; // 0..1 while a file is moving
   String _progressText = '';
+  LibraryStore? _store;
+  String? _receivingName; // The file coming in, once its header has arrived
 
   @override
   void initState() {
     super.initState();
+    LibraryStore.instance().then((store) {
+      if (!mounted) return;
+      store.addListener(_onStore);
+      setState(() => _store = store);
+    }).catchError((Object e) => debugPrint("Error opening the library store: $e"));
     _start();
   }
 
   @override
   void dispose() {
+    _store?.removeListener(_onStore);
     _events?.cancel();
     _server?.close();
     WifiDirect.stopDiscovery().catchError((_) {});
     WifiDirect.disconnect().catchError((_) {});
     super.dispose();
+  }
+
+  void _onStore() => _set(() {});
+
+  void _record(String name, {required bool ok}) {
+    _store?.addTransfer(TransferRecord(
+      name: name,
+      sent: widget.isSending,
+      kind: widget.isSending ? widget.kind : _lastKind,
+      time: DateTime.now(),
+      ok: ok,
+    ));
   }
 
   void _set(VoidCallback change) {
@@ -151,6 +171,9 @@ class _TransferScreenState extends State<TransferScreen> {
       }
       widget.isSending ? await _send(socket) : await _receive(socket);
     } catch (e) {
+      String? failed = widget.isSending ? widget.sendName : _receivingName;
+      if (failed != null) _record(failed, ok: false);
+      _receivingName = null;
       _fail(widget.isSending
           ? "The transfer stopped before it finished. Try again. ($e)"
           : "The transfer stopped before it finished. Ask the sender to try again. ($e)");
@@ -177,6 +200,7 @@ class _TransferScreenState extends State<TransferScreen> {
       kind: widget.kind.name,
       onProgress: _showProgress,
     );
+    _record(widget.sendName!, ok: true);
     _set(() {
       _status = "Sent ${widget.sendName}.";
       _busy = false;
@@ -191,12 +215,15 @@ class _TransferScreenState extends State<TransferScreen> {
       temp,
       onHeader: (header) => _set(() {
         name = header.name;
+        _receivingName = header.name;
         _status = "Receiving ${header.name}…";
         _progress = 0;
       }),
       onProgress: _showProgress,
       save: _save,
     );
+    _record(name ?? "A file", ok: true);
+    _receivingName = null;
     _set(() {
       _status = "Received $name. It's in your ${_lastKind == MediaKind.audio ? "Music" : "Videos"}. "
           "Ready for another file.";
@@ -365,10 +392,54 @@ class _TransferScreenState extends State<TransferScreen> {
                 ),
               ),
             ],
+            if (_store?.transfers.isNotEmpty ?? false) ...[
+              SizedBox(height: 12),
+              _history(panel, colors),
+            ],
             SizedBox(height: 12),
             _howItWorks(panel, colors),
           ],
         ),
+      ),
+    );
+  }
+
+  /// The last few files sent or received, newest first.
+  Widget _history(BoxDecoration panel, ColorScheme colors) {
+    List<TransferRecord> records = _store!.transfers.take(10).toList();
+    String ago(DateTime time) {
+      Duration age = DateTime.now().difference(time);
+      if (age.inMinutes < 1) return "just now";
+      if (age.inHours < 1) return "${age.inMinutes} min ago";
+      if (age.inDays < 1) return "${age.inHours} h ago";
+      return "${age.inDays} d ago";
+    }
+
+    return Container(
+      decoration: panel,
+      padding: EdgeInsets.fromLTRB(12, 12, 4, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text("Recent transfers", style: TextStyle(fontWeight: FontWeight.w600))),
+              TextButton(onPressed: _store!.clearTransfers, child: Text("Clear")),
+            ],
+          ),
+          for (TransferRecord record in records)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              leading: Icon(record.sent ? Icons.call_made : Icons.call_received,
+                  color: record.ok ? null : colors.error),
+              title: Text(record.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+              subtitle: Text(
+                "${record.sent ? "Sent" : "Received"}${record.ok ? "" : ", didn't finish"} · ${ago(record.time)}",
+                style: TextStyle(color: record.ok ? colors.onSurfaceVariant : colors.error),
+              ),
+            ),
+        ],
       ),
     );
   }

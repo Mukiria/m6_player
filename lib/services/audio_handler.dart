@@ -1,6 +1,7 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
+import 'car_browser.dart';
 import 'player_service.dart';
 
 /// Connects the app's player to the system media controls: the notification
@@ -99,10 +100,24 @@ class M6AudioHandler extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> skipToPrevious() => _service.previous();
 
+  // Android Auto: the car's browse menu and voice commands (see CarBrowser).
+  @override
+  Future<List<MediaItem>> getChildren(String parentMediaId, [Map<String, dynamic>? options]) =>
+      CarBrowser.children(parentMediaId);
+
+  @override
+  Future<MediaItem?> getMediaItem(String mediaId) => CarBrowser.item(mediaId);
+
+  @override
+  Future<void> playFromMediaId(String mediaId, [Map<String, dynamic>? extras]) => CarBrowser.play(mediaId);
+
+  @override
+  Future<void> playFromSearch(String query, [Map<String, dynamic>? extras]) => CarBrowser.playSearch(query);
+
   /// Stop (also the close button): stops playback and removes the notification.
   @override
   Future<void> stop() async {
-    await _player.stop();
+    await _service.stop();
     await super.stop();
   }
 

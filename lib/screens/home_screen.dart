@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../services/app_settings.dart';
 import '../services/player_service.dart';
 import '../widgets/mini_player.dart';
 import 'music_player_screen.dart';
+import 'onboarding_screen.dart';
 import 'radio_screen.dart';
 import 'video_screen.dart';
 
@@ -20,8 +22,14 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Before anything plays, so the system prompt can't interrupt the first song.
-    WidgetsBinding.instance.addPostFrameCallback((_) => PlayerService.instance.askForNotifications());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // First run: the intro pages come first, then the permission prompt.
+      if (!AppSettings.instance.onboarded && mounted) {
+        await Navigator.of(context).push(MaterialPageRoute(builder: (context) => const OnboardingScreen()));
+      }
+      // Before anything plays, so the system prompt can't interrupt the first song.
+      PlayerService.instance.askForNotifications();
+    });
   }
 
   @override

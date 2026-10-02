@@ -33,6 +33,36 @@
 - `android/app/src/main/java/com/msixv/com/m6player/`: `MainActivity.java` (permissions, open app, device name) and `WifiDirect.java`.
 - Tests in `test/` (48 as of 2026-10-02): file helpers, tags, library store and sorting, settings and presets, the transfer protocol, and widget tests with fake audio plugin channels.
 
+## Privacy: what stays on the phone and what goes online
+
+Wording used in the first-run Permissions page (`lib/screens/onboarding_screen.dart`):
+
+> M6 Player may ask to show playback controls in your notifications, and to see the videos on your phone. They're only used to play your media. Your music, videos and playlists stay on your phone. The only things that go online are radio: looking up stations and streaming them.
+
+What that rests on (checked in the code, 2026-10-02):
+- **Stays on the phone**: songs, videos, playlists, favourites, play counts, video resume positions, the Hidden PIN (a salted hash) and settings. There is no analytics, advertising, crash reporting or sign-in package.
+- **Goes online**: (1) the station lists, from radio-browser.info (`lib/services/radio_api.dart`): the request carries the country code (the phone's region, or the country picked) and, for a genre search, the genre, and the service sees the phone's IP address like any website would; (2) a playing station's stream, straight from that station's own server (which sees the IP address); (3) the Privacy policy and Terms links, which open in the browser.
+- **Leaves only when the user chooses**: Share (to the app picked, including a backup file) and Wi-Fi Direct file transfer (straight to the other phone).
+- **To check**: that the published privacy policy at msixv.com mentions the radio lookups, and that the Play Console data-safety form matches the list above.
+
+## Selling points (USPs) for promotion and ads
+
+- **USP: Android Auto** (first version built 2026-10-02, full version planned for version 2): play your own music and favourite radio stations from the car's screen and with voice ("play Sauti Sol on M6 Player"), with no streaming subscription. Few offline local-file players do this well, so it's the lead point for promotions and ads. **Don't advertise it until** it has been tested in the Android Auto Desktop Head Unit or a real car, and the Play Console review for Android Auto has passed (see item 26). Say "music and radio" only: video isn't allowed in Android Auto.
+- Others to build ads around, from the feature list: the folder carousel and gesture controls in the video player, one app for music, video and radio, playlists that build themselves (smart playlists), nothing to sign in to, and the privacy story above.
+
+### Android Auto: what's in this version and what's not
+
+**In this version (version 1)**: the car menu with Songs (newest first), Favourites, Playlists (song playlists) and Radio favourites, at most 100 items each, hidden songs left out; tapping a song plays it with the rest of its list; voice search ("play ...") plays songs whose title, artist or album matches. Code: `lib/services/car_browser.dart`, hooked into `M6AudioHandler`; `res/xml/automotive_app_desc.xml` and a meta-data in the manifest declare a media app.
+
+**Not in this version** (all planned for version 2):
+- Cover art in the car (needs a small content provider, because our covers are private files the car can't open).
+- Browsing by Albums, Artists and Genres.
+- Recent radio stations, and a "recently played" entry at the top of the menu.
+- Smart playlists (most played, recently played, recently added) in the car menu.
+- Voice search for playlists, albums and radio stations (version 1 matches songs only), and "play my favourites".
+- Paging for lists longer than 100 items.
+- Anything that needs the Android Auto emulator or a car to settle, such as how the lists look on a head unit and any fixes from Google's review.
+
 ## Where it stands (2026-10-02)
 
 **Done**
@@ -45,6 +75,10 @@
 **Status**
 - `6ae6212` (equalizer, light/dark mode, legal links, playing song on top) built on iOS, but 1 of 48 Android tests failed: the new top-bar menu's rows overflowed their 256 px width with the longest label ("Terms of service (EULA)"). Fixed in the next commit (labels can wrap), along with `pubspec.lock` from CI. The last fully green run is `da12991` (Wi-Fi Direct transfer, rename): 44 tests, release APK (60.2 MB), unsigned iOS build.
 - **Checked on the itel S667LN**: the new look, playback, headset buttons, the notification and its buttons, lock screen. **Not yet checked on a phone**: the equalizer, light/dark mode switch, the playing song scrolling to the top, the options sheet buttons, swiping the app away, and file transfer (needs two Android phones).
+
+## Version 2 plan
+
+- **Full Android Auto** (a USP, see above): everything under "Not in this version", then a test in the Desktop Head Unit and a real car, then the Play Console Android Auto review before any advertising.
 
 ## To do
 
@@ -78,6 +112,17 @@
     - **Equalizer** (`lib/screens/equalizer_screen.dart`): on/off, presets (Flat, Bass boost, Treble boost, Vocal, Rock, Pop, Jazz, Classical) and a slider per band, using just_audio's `AndroidEqualizer` in the player's audio pipeline. Android only makes it available once something has played, so the screen asks to play first; saved settings are applied automatically every time after that.
     - Settings (light/dark mode, equalizer) are saved in `<app documents>/settings.json` (`lib/services/app_settings.dart`).
     - **Playing song on top**: in every song list, next/previous (or a song ending) smoothly scrolls the playing song to the top; opening a list or re-sorting puts it there too. Rows are a fixed 72 px, with room under the last song so any song can reach the top.
+- [x] **25. Big batch of improvements (2026-10-02)**: 
+    - **Video player**: a carousel of the other videos in the same folder under the player in portrait (one video per swipe), hidden in landscape for full screen; resume where you stopped (positions in `library.json`); swipe the left half for brightness and the right half for volume (`screen_brightness`, `volume_controller`); playback speed menu; sleep timer; hold for 2x; aspect-ratio button (Fit, Fill, 16:9, 4:3); touch lock; pauses when headphones unplug or a call comes in (`audio_session`).
+    - **Search** (magnifier in the top bar, `lib/screens/search_screen.dart`): songs, videos and playlists. **Browse** tab in Music (albums, artists) and **Folders** tab in Video. **Video sort** (newest, oldest, name, longest).
+    - **Hidden & filtered** can be locked with a PIN (`crypto`; no recovery except clearing the app's data).
+    - **Queue editing** in Up next (drag to reorder, remove, save as playlist), **multi-select** by long-press (favourite, add to, hide, delete for songs), **backup and restore** of the library to a JSON file (⋮ menu, via the share sheet and file picker), music **playback speed**.
+    - **Radio**: favourite stations, recently played, genre chips with a Worldwide option, change country (globe icon), and **auto-reconnect** when a stream drops (2, 4, 8 then 15 s, up to 6 tries; "Reconnecting…" on Now Playing).
+    - **Play counts** (a song counts after 30 s) and **smart playlists** (most played, recently played, recently added, never played) at the top of each Playlists tab. **First-run onboarding** pages.
+    - **First install fix**: after a fresh install songs and radio wouldn't play until the app was restarted. The notification permission is now requested when the app opens (after the intro pages), not as the first song starts; this fixed it on the phone.
+    - Storage: `library.json` now also holds the video sort, radio favourites and recent stations, play counts and video positions; `settings.json` holds the PIN hash, the radio country and the onboarding flag.
+- [x] **26. Android Auto, first version (2026-10-02)**: **USP, see "Selling points".** `res/xml/automotive_app_desc.xml` plus a `com.google.android.gms.car.application` meta-data in the manifest declare a media app. `lib/services/car_browser.dart` supplies the car's menu through `M6AudioHandler` (`getChildren`, `getMediaItem`, `playFromMediaId`, `playFromSearch`): **Songs** (newest first), **Favourites**, **Playlists** (song playlists) and **Radio favourites**, at most 100 items each, hidden songs left out; tapping a song plays it with the rest of its list; voice search plays songs whose title, artist or album matches. The root asks for list style (`androidBrowsableRootExtras` in `main.dart`). **Not in this version (for version 2)**: see "Android Auto: what's in this version and what's not" above. **Untested**: needs the Android Auto Desktop Head Unit or a car. **Before promoting**: test it there, and expect Google's Android Auto media-app review in Play Console (driver-distraction rules, a proper browse menu); also mention the car showing song and playlist names in the privacy notes.
+- [x] **27. Smaller additions (2026-10-02)**: playlists are searchable; bulk delete for songs in multi-select; radio auto-reconnect; first-run onboarding; screen-reader labels on seek bars and the carousel; an in-memory thumbnail cache; genres in Browse and lyrics (embedded tags) on Now Playing; "Edit info" (title, artist, album, genre, written into the library's copy of the file); **transfer history** (the last 30 files sent or received, shown on the transfer page, in `library.json` as `transfers`).
 - [ ] **Test on a phone**: the equalizer, light/dark mode, the playing song scrolling to the top, every options sheet button, swiping the app away, and adding a folder. File transfer needs a second Android phone with M6 Player.
 - [ ] **Play Console** before publishing: the "Photo and video permissions" declaration (reading videos; core use: video player), and check the data-safety form now that the app uses nearby Wi-Fi devices (file transfer) and opens web links.
 - [ ] Back up the release keystore and `android/key.properties` (for example in a password manager).

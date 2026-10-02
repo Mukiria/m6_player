@@ -61,6 +61,7 @@ Future<void> showSongOptions(BuildContext context, File song, {ItemList from = I
         "File name": songKey(song),
         "Added": _date(song.lastModifiedSync()),
       }),
+      edit: () => _editSong(context, song, info),
       delete: () => _deleteSong(context, song, info.title),
     ),
   );
@@ -129,6 +130,7 @@ List<SheetOption> _commonOptions(
   required VoidCallback playLast,
   required Future<File?> Function() file,
   required VoidCallback info,
+  VoidCallback? edit, // Songs only
   required VoidCallback delete,
 }) {
   bool isFavourite = store.isFavourite(key);
@@ -187,6 +189,7 @@ List<SheetOption> _commonOptions(
       label: "Filter out",
       onTap: () => _filterOut(context, store, key, from, playlistId),
     ),
+    if (edit != null) SheetOption(icon: Icons.edit_outlined, label: "Edit info", onTap: edit),
     SheetOption(icon: Icons.info_outline, label: "Info", onTap: info),
     SheetOption(icon: Icons.delete_outline, label: "Delete", destructive: true, onTap: delete),
   ];
@@ -214,6 +217,54 @@ Future<void> _filterOut(BuildContext context, LibraryStore store, String key, It
         _message(context, "Removed from the playlist", undo: () => store.addToPlaylist(playlistId, key));
       }
   }
+}
+
+/// Edit a song's title, artist, album and genre. Written into the library's copy of the file.
+Future<void> _editSong(BuildContext context, File song, TrackInfo info) async {
+  TextEditingController title = TextEditingController(text: info.title);
+  TextEditingController artist = TextEditingController(text: info.artist ?? '');
+  TextEditingController album = TextEditingController(text: info.album ?? '');
+  TextEditingController genre = TextEditingController(text: info.genre ?? '');
+  bool save = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text("Edit info"),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for ((String, TextEditingController) field in [
+                  ("Title", title),
+                  ("Artist", artist),
+                  ("Album", album),
+                  ("Genre", genre),
+                ])
+                  TextField(
+                    controller: field.$2,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: InputDecoration(labelText: field.$1),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: Text("Cancel")),
+            TextButton(onPressed: () => Navigator.pop(context, true), child: Text("Save")),
+          ],
+        ),
+      ) ??
+      false;
+  String newTitle = title.text.trim();
+  if (!save || newTitle.isEmpty) return;
+  String? clean(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
+  bool done = await TrackInfoService.instance
+      .editTags(song, title: newTitle, artist: clean(artist), album: clean(album), genre: clean(genre));
+  if (done) MusicLibrary.instance.tagsChanged();
+  _message(
+      context,
+      done
+          ? "Saved. The player shows the new info the next time the song starts."
+          : "Couldn't save the changes to this file");
 }
 
 Future<void> _deleteSong(BuildContext context, File song, String title) async {

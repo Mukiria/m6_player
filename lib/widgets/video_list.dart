@@ -98,7 +98,9 @@ class _VideoListState extends State<VideoList> {
               builder: (context) => VideoPlayerScreen(videos: videos, index: index),
             )),
       onLongPress: () => _toggleSelected(video),
-      child: Container(
+      child: Semantics(
+        selected: selected,
+        child: Container(
         color: selected ? colors.primary.withValues(alpha: 0.12) : null,
         child: Padding(
         padding: EdgeInsets.only(left: 16, top: 6, bottom: 6),
@@ -128,6 +130,7 @@ class _VideoListState extends State<VideoList> {
         ),
       ),
       ),
+      ),
     );
   }
 }
@@ -139,6 +142,29 @@ String videoTitle(AssetEntity video) {
   name = dot > 0 ? name.substring(0, dot) : name;
   return name.isEmpty ? "Video" : name;
 }
+
+/// Remembers the most recent thumbnails, so scrolling a list back up, switching
+/// tabs or opening the carousel doesn't ask the phone to make them all again.
+class _ThumbnailCache {
+  static const int _capacity = 300; // About 3 MB of small JPEGs
+  final Map<String, Future<Uint8List?>> _entries = {}; // Oldest first
+
+  Future<Uint8List?> of(AssetEntity video) {
+    Future<Uint8List?>? cached = _entries.remove(video.id);
+    if (cached == null) {
+      cached = video.thumbnailDataWithSize(ThumbnailSize(256, 144), quality: 80);
+      // A failed or empty thumbnail isn't kept, so it's tried again next time.
+      cached.then((data) {
+        if (data == null) _entries.remove(video.id);
+      }, onError: (Object e) => _entries.remove(video.id));
+    }
+    _entries[video.id] = cached; // Now the most recent
+    if (_entries.length > _capacity) _entries.remove(_entries.keys.first);
+    return cached;
+  }
+}
+
+final _ThumbnailCache _thumbnails = _ThumbnailCache();
 
 /// A video's thumbnail with its length in the corner, as in most video players.
 class VideoThumbnail extends StatefulWidget {
@@ -158,7 +184,7 @@ class _VideoThumbnailState extends State<VideoThumbnail> {
   @override
   void initState() {
     super.initState();
-    _thumbnail = widget.video.thumbnailDataWithSize(ThumbnailSize(256, 144), quality: 80);
+    _thumbnail = _thumbnails.of(widget.video);
   }
 
   @override

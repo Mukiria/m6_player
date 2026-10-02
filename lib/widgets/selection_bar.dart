@@ -9,6 +9,7 @@ class SelectionBar extends StatelessWidget {
   final VoidCallback onFavourite;
   final VoidCallback onAddTo;
   final VoidCallback onHide;
+  final VoidCallback? onDelete; // Songs only: videos are the phone's own files
 
   const SelectionBar({
     super.key,
@@ -18,6 +19,7 @@ class SelectionBar extends StatelessWidget {
     required this.onFavourite,
     required this.onAddTo,
     required this.onHide,
+    this.onDelete,
   });
 
   @override
@@ -34,6 +36,7 @@ class SelectionBar extends StatelessWidget {
           IconButton(tooltip: "Favourite", icon: Icon(Icons.favorite_border), onPressed: onFavourite),
           IconButton(tooltip: "Add to…", icon: Icon(Icons.playlist_add), onPressed: onAddTo),
           IconButton(tooltip: "Hide", icon: Icon(Icons.visibility_off_outlined), onPressed: onHide),
+          if (onDelete != null) IconButton(tooltip: "Delete", icon: Icon(Icons.delete_outline), onPressed: onDelete),
         ],
       ),
     );

@@ -14,6 +14,7 @@ class PlayerService {
   PlayerService._() {
     _applySavedEqualizer();
     _countPlays();
+    _watchRadio();
   }
   static final PlayerService instance = PlayerService._();
 
@@ -57,6 +58,78 @@ class PlayerService {
     });
   }
 
+  // Radio auto-reconnect: when a stream drops (a network blip, a tunnel) it's
+  // reloaded after 2, 4, 8, then every 15 seconds, up to 6 tries, as long as
+  // the user hasn't paused or stopped it.
+  String? _radioUrl;
+  String? _radioTitle;
+  int _reconnects = 0;
+  Timer? _reconnectTimer;
+  Timer? _stallTimer;
+
+  /// True while a dropped station is being reconnected.
+  final ValueNotifier<bool> reconnecting = ValueNotifier(false);
+
+  static const List<int> _reconnectDelays = [2, 4, 8, 15, 15, 15];
+
+  void _watchRadio() {
+    player.playbackEventStream.listen((_) {}, onError: (Object e, StackTrace s) => _scheduleReconnect());
+    player.processingStateStream.listen((state) {
+      if (state == ProcessingState.ready) {
+        _reconnects = 0;
+        _reconnectTimer?.cancel();
+        _reconnectTimer = null;
+        _stallTimer?.cancel();
+        reconnecting.value = false;
+      } else if (state == ProcessingState.buffering && _radioUrl != null) {
+        // Buffering for 20 seconds on end means the stream has stalled
+        _stallTimer ??= Timer(Duration(seconds: 20), () {
+          _stallTimer = null;
+          _scheduleReconnect();
+        });
+      } else {
+        _stallTimer?.cancel();
+        _stallTimer = null;
+      }
+    });
+    player.playingStream.listen((playing) {
+      if (!playing) _stopReconnecting(); // Paused or stopped by the user: leave it be
+    });
+  }
+
+  void _stopReconnecting() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _stallTimer?.cancel();
+    _stallTimer = null;
+    _reconnects = 0;
+    reconnecting.value = false;
+  }
+
+  void _scheduleReconnect() {
+    String? url = _radioUrl;
+    String? title = _radioTitle;
+    if (url == null || title == null || isLibraryActive || !player.playing) return;
+    if (_reconnectTimer != null || _reconnects >= _reconnectDelays.length) return;
+    reconnecting.value = true;
+    _reconnectTimer = Timer(Duration(seconds: _reconnectDelays[_reconnects++]), () async {
+      _reconnectTimer = null;
+      if (_radioUrl != url || isLibraryActive) return; // Something else is playing now
+      try {
+        await player.setAudioSource(_radioSource(url, title));
+        player.play();
+      } catch (e) {
+        debugPrint("Radio reconnect failed: $e");
+        _scheduleReconnect();
+      }
+    });
+  }
+
+  AudioSource _radioSource(String url, String title) => AudioSource.uri(
+        Uri.parse(url),
+        tag: MediaItem(id: url, title: title, album: 'Radio', extras: {'radio': true}),
+      );
+
   /// Asks Android 13+ for the notification permission (see MainActivity.java),
   /// once per app run, when the app opens rather than as the first song starts,
   /// so the system prompt can't land in the middle of starting playback.
@@ -97,6 +170,8 @@ class PlayerService {
       await TrackInfoService.instance.load(tracks); // Usually already read by the Music tab
       await player.setAudioSources(tracks.map(_trackSource).toList(), initialIndex: index);
       isLibraryActive = true;
+      _radioUrl = null;
+      _stopReconnecting();
       queueId = id;
       _queuePaths = paths;
     }
@@ -197,15 +272,19 @@ class PlayerService {
     isLibraryActive = false;
     queueId = null;
     _queuePaths = [];
+    _stopReconnecting();
+    _radioUrl = url;
+    _radioTitle = title;
     await player.setSpeed(1.0); // A live stream can't be sped up
-    await player.setAudioSource(AudioSource.uri(
-      Uri.parse(url),
-      tag: MediaItem(id: url, title: title, album: 'Radio', extras: {'radio': true}),
-    ));
+    await player.setAudioSource(_radioSource(url, title));
     player.play();
   }
 
-  Future<void> stop() => player.stop();
+  Future<void> stop() {
+    _radioUrl = null; // A stopped station must not reconnect
+    _stopReconnecting();
+    return player.stop();
+  }
 
   /// Play button. After the last song has finished, starts again from the first.
   Future<void> resume() async {
