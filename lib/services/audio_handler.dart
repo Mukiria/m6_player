@@ -22,7 +22,7 @@ class M6AudioHandler extends BaseAudioHandler with SeekHandler {
 
   static final MediaControl _logo = MediaControl.custom(
     androidIcon: 'drawable/ic_notification_logo',
-    label: 'Open m6 player',
+    label: 'Open M6 Player',
     name: openAppAction,
   );
 

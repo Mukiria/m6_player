@@ -125,7 +125,7 @@ class _VideoScreenState extends State<VideoScreen> {
                 ? _message(
                     colors,
                     icon: Icons.video_library_outlined,
-                    text: "Allow m6 player to see your videos to play them here.",
+                    text: "Allow M6 Player to see your videos to play them here.",
                     buttonLabel: "Allow access",
                     // A second request is usually blocked by the system: send people to Settings.
                     onPressed: PhotoManager.openSetting,

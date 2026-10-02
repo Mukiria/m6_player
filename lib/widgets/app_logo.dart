@@ -68,13 +68,13 @@ class _AppLogoState extends State<AppLogo> with SingleTickerProviderStateMixin {
       return SvgPicture.asset(
         dark ? 'assets/branding/logo-dark.svg' : 'assets/branding/logo-light.svg',
         height: widget.height,
-        semanticsLabel: 'm6 player',
+        semanticsLabel: 'M6 Player',
       );
     }
     LogoTheme theme = dark ? logoDark : logoLight;
     double width = widget.height * logoViewBox[2] / logoViewBox[3];
     return Semantics(
-      label: 'm6 player',
+      label: 'M6 Player',
       child: SizedBox(
         width: width,
         height: widget.height,

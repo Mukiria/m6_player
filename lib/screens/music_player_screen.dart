@@ -125,7 +125,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
       Directory? folder = await pickFolder();
       if (folder == null) return;
       if (!await requestAudioPermission()) {
-        _showMessage("m6 player needs permission to read your music to add a folder.");
+        _showMessage("M6 Player needs permission to read your music to add a folder.");
         return;
       }
       List<File> songs = await findMp3s(folder);

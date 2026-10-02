@@ -221,7 +221,7 @@ Future<void> _deleteSong(BuildContext context, File song, String title) async {
         context: context,
         builder: (context) => AlertDialog(
           title: Text("Delete song?"),
-          content: Text("Delete \"$title\" from m6 player? It's also removed from your favourites and playlists. "
+          content: Text("Delete \"$title\" from M6 Player? It's also removed from your favourites and playlists. "
               "The original file on your device is not affected."),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context, false), child: Text("Cancel")),

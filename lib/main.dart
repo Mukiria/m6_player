@@ -27,7 +27,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'm6 player',
+      title: 'M6 Player',
       // Light or dark, following the phone's setting
       theme: lightTheme(),
       darkTheme: darkTheme(),

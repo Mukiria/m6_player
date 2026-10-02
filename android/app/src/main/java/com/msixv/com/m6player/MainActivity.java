@@ -7,6 +7,7 @@ import android.os.Build;
 import androidx.annotation.NonNull;
 import com.ryanheise.audioservice.AudioServiceActivity;
 import io.flutter.embedding.engine.FlutterEngine;
+import io.flutter.plugin.common.EventChannel;
 import io.flutter.plugin.common.MethodChannel;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,15 +18,17 @@ import java.util.List;
  * <ul>
  *   <li>request: ask for the notification permission (Android 13+)</li>
  *   <li>openApp: bring the app to the front (the m6 button in the playback notification)</li>
- *   <li>nearbyPermissions: ask for what nearby file transfer needs (Bluetooth,
- *       nearby Wi-Fi devices, location); answers true when all are granted</li>
- *   <li>deviceName: this phone's maker and model, shown to the other phone during a transfer</li>
+ *   <li>transferPermissions: ask for what Wi-Fi Direct file transfer needs (nearby
+ *       Wi-Fi devices on Android 13+, location before that); true when granted</li>
+ *   <li>deviceName: this phone's maker and model</li>
  * </ul>
+ * Wi-Fi Direct itself has its own channels; see {@link WifiDirect}.
  */
 public class MainActivity extends AudioServiceActivity {
     private static final String CHANNEL = "com.msixv.com.m6player/notifications";
     private static final int NOTIFICATIONS_REQUEST = 6001;
     private static final int NEARBY_REQUEST = 6002;
+    private static final String WIFI_DIRECT = "com.msixv.com.m6player/wifidirect";
 
     /** Waiting for the user to answer the nearby permissions prompt. */
     private MethodChannel.Result pendingNearbyResult;
@@ -60,7 +63,7 @@ public class MainActivity extends AudioServiceActivity {
                             result.success(granted);
                             break;
                         }
-                        case "nearbyPermissions":
+                        case "transferPermissions":
                             requestNearbyPermissions(result);
                             break;
                         case "deviceName":
@@ -70,6 +73,11 @@ public class MainActivity extends AudioServiceActivity {
                             result.notImplemented();
                     }
                 });
+        WifiDirect wifiDirect = new WifiDirect(this);
+        new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), WIFI_DIRECT)
+                .setMethodCallHandler(wifiDirect);
+        new EventChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), WIFI_DIRECT + "/events")
+                .setStreamHandler(wifiDirect);
     }
 
     /** "itel S667LN" rather than "ITEL itel S667LN": the maker only when the model doesn't start with it. */
@@ -79,21 +87,13 @@ public class MainActivity extends AudioServiceActivity {
         return maker + " " + model;
     }
 
-    /** The runtime permissions Nearby Connections needs on this Android version. */
+    /**
+     * The runtime permission Wi-Fi Direct needs: "Nearby devices" (NEARBY_WIFI_DEVICES,
+     * declared neverForLocation) on Android 13+, location before that.
+     */
     private static String[] nearbyPermissions() {
-        List<String> permissions = new ArrayList<>();
-        if (Build.VERSION.SDK_INT >= 31) {
-            permissions.add(Manifest.permission.BLUETOOTH_SCAN);
-            permissions.add(Manifest.permission.BLUETOOTH_ADVERTISE);
-            permissions.add(Manifest.permission.BLUETOOTH_CONNECT);
-        }
-        if (Build.VERSION.SDK_INT >= 33) {
-            permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES);
-        }
-        // Location: required before Android 13, and still needed by some phones'
-        // Bluetooth scanning afterwards, so it's asked for on every version.
-        permissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
-        return permissions.toArray(new String[0]);
+        if (Build.VERSION.SDK_INT >= 33) return new String[] {Manifest.permission.NEARBY_WIFI_DEVICES};
+        return new String[] {Manifest.permission.ACCESS_FINE_LOCATION};
     }
 
     private void requestNearbyPermissions(MethodChannel.Result result) {
