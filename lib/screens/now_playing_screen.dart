@@ -337,50 +337,105 @@ class _QueueSheet extends StatelessWidget {
       builder: (context, snapshot) {
         SequenceState state = snapshot.data ?? player.sequenceState;
         List<IndexedAudioSource> sequence = state.sequence;
-        List<int> order = state.shuffleModeEnabled
-            ? state.shuffleIndices
-            : List.generate(sequence.length, (index) => index);
+        bool shuffled = state.shuffleModeEnabled;
+        // Reordering only makes sense in the playlist's own order.
+        List<int> order = shuffled ? state.shuffleIndices : List.generate(sequence.length, (index) => index);
+
+        Widget tile(int position) {
+          int index = order[position];
+          MediaItem? item = sequence[index].tag as MediaItem?;
+          bool isCurrent = index == state.currentIndex;
+          return ListTile(
+            key: ValueKey(item?.id ?? index),
+            leading: isCurrent ? Icon(Icons.graphic_eq, color: brandBlueLight) : null,
+            title: Text(
+              item?.title ?? '',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: isCurrent ? brandBlueLight : Colors.white),
+            ),
+            subtitle: item == null
+                ? null
+                : Text(itemSubtitle(item),
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white60)),
+            onTap: () {
+              player.seek(Duration.zero, index: index);
+              player.play();
+              Navigator.of(context).pop();
+            },
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: "Remove from queue",
+                  icon: Icon(Icons.close, color: Colors.white60),
+                  onPressed: () => PlayerService.instance.removeTrackAt(index),
+                ),
+                if (!shuffled)
+                  ReorderableDragStartListener(index: position, child: Icon(Icons.drag_handle, color: Colors.white60)),
+              ],
+            ),
+          );
+        }
+
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Padding(
-                padding: EdgeInsets.all(16),
-                child: Text('Up next', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+                padding: EdgeInsets.fromLTRB(16, 8, 8, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text('Up next',
+                          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+                    ),
+                    TextButton.icon(
+                      onPressed: sequence.isEmpty ? null : () => _saveAsPlaylist(context, sequence),
+                      icon: Icon(Icons.playlist_add, color: brandBlueLight),
+                      label: Text("Save as playlist", style: TextStyle(color: brandBlueLight)),
+                    ),
+                  ],
+                ),
               ),
               Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: order.length,
-                  itemBuilder: (context, position) {
-                    int index = order[position];
-                    MediaItem? item = sequence[index].tag as MediaItem?;
-                    bool isCurrent = index == state.currentIndex;
-                    return ListTile(
-                      leading: isCurrent ? Icon(Icons.graphic_eq, color: brandBlueLight) : null,
-                      title: Text(
-                        item?.title ?? '',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: isCurrent ? brandBlueLight : Colors.white),
+                child: shuffled
+                    ? ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: order.length,
+                        itemBuilder: (context, position) => tile(position),
+                      )
+                    : ReorderableListView.builder(
+                        shrinkWrap: true,
+                        buildDefaultDragHandles: false,
+                        itemCount: order.length,
+                        onReorder: (oldIndex, newIndex) {
+                          if (newIndex > oldIndex) newIndex--;
+                          PlayerService.instance.moveTrack(oldIndex, newIndex);
+                        },
+                        itemBuilder: (context, position) => tile(position),
                       ),
-                      subtitle: item == null
-                          ? null
-                          : Text(itemSubtitle(item),
-                              maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white60)),
-                      onTap: () {
-                        player.seek(Duration.zero, index: index);
-                        player.play();
-                        Navigator.of(context).pop();
-                      },
-                    );
-                  },
-                ),
               ),
             ],
           ),
         );
       },
     );
+  }
+
+  /// Saves what's in the queue, in its order, as a new playlist.
+  Future<void> _saveAsPlaylist(BuildContext context, List<IndexedAudioSource> sequence) async {
+    String? name = await askPlaylistName(context, title: "Save queue as playlist");
+    if (name == null) return;
+    LibraryStore store = await LibraryStore.instance();
+    Playlist playlist = await store.createPlaylist(name, kind: MediaKind.audio);
+    List<String> keys = [
+      for (IndexedAudioSource source in sequence)
+        if (source.tag is MediaItem) songKey(File((source.tag as MediaItem).id)),
+    ];
+    await store.addAllToPlaylist(playlist.id, keys);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Saved ${keys.length} songs to $name")));
+    }
   }
 }

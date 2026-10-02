@@ -5,7 +5,9 @@ import '../services/library_store.dart';
 import '../services/music_library.dart';
 import '../services/track_info.dart';
 import '../services/video_library.dart';
+import '../services/app_settings.dart';
 import '../widgets/artwork.dart';
+import '../widgets/pin_dialog.dart';
 import '../widgets/video_list.dart';
 
 /// Songs and videos taken out of view: Hidden ones (left out of every list)
@@ -54,7 +56,23 @@ class _HiddenScreenState extends State<HiddenScreen> {
     List<String> filtered = store?.filteredOut.toList() ?? [];
     ColorScheme colors = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: Text("Hidden & filtered")),
+      appBar: AppBar(
+        title: Text("Hidden & filtered"),
+        actions: [
+          ListenableBuilder(
+            listenable: AppSettings.instance,
+            builder: (context, _) => PopupMenuButton<String>(
+              tooltip: "PIN",
+              icon: Icon(AppSettings.instance.hasPin ? Icons.lock : Icons.lock_open),
+              onSelected: (action) => action == "remove" ? removePin(context) : changePin(context),
+              itemBuilder: (context) => [
+                PopupMenuItem(value: "set", child: Text(AppSettings.instance.hasPin ? "Change PIN" : "Set a PIN")),
+                if (AppSettings.instance.hasPin) PopupMenuItem(value: "remove", child: Text("Remove PIN")),
+              ],
+            ),
+          ),
+        ],
+      ),
       body: store == null
           ? Center(child: CircularProgressIndicator())
           : hidden.isEmpty && filtered.isEmpty

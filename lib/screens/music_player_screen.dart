@@ -190,6 +190,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
                 icon: Icon(Icons.add),
                 onPressed: _isImporting ? null : _showAddOptions,
               ),
+              const SearchButton(),
               const AppMenuButton(),
             ],
             bottom: PreferredSize(

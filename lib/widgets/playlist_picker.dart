@@ -29,7 +29,64 @@ Future<String?> askPlaylistName(BuildContext context, {String title = "New playl
 
 /// "Add to" sheet: Favourites, Latest, one of the playlists for this kind of
 /// item, or a new playlist. [key] is the item's songKey() or videoKey().
-Future<void> showAddTo(BuildContext context, {required String key, required MediaKind kind}) async {
+Future<void> showAddTo(BuildContext context, {required String key, required MediaKind kind}) =>
+    showAddToMany(context, keys: [key], kind: kind);
+
+/// [showAddTo] for several items at once (multi-select).
+Future<void> showAddToMany(BuildContext context, {required List<String> keys, required MediaKind kind}) async {
+  if (keys.length == 1) return _showAddToOne(context, key: keys.first, kind: kind);
+  LibraryStore store = await LibraryStore.instance();
+  if (!context.mounted) return;
+  ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+  void done(String message) => messenger.showSnackBar(SnackBar(content: Text(message)));
+  String count = "${keys.length} items";
+
+  await showOptionsSheet(
+    context,
+    title: "Add $count to",
+    options: [
+      SheetOption(
+        icon: Icons.favorite_border,
+        label: "Favourites",
+        onTap: () async {
+          await store.addAllToFavourites(keys);
+          done("Added $count to Favourites");
+        },
+      ),
+      SheetOption(
+        icon: Icons.fiber_new_outlined,
+        label: "Latest",
+        onTap: () async {
+          await store.addAllToLatest(keys);
+          done("Added $count to Latest");
+        },
+      ),
+      for (Playlist playlist in store.playlistsOf(kind))
+        SheetOption(
+          icon: Icons.queue_music,
+          label: playlist.name,
+          onTap: () async {
+            int added = await store.addAllToPlaylist(playlist.id, keys);
+            done("Added $added to ${playlist.name}");
+          },
+        ),
+      SheetOption(
+        icon: Icons.playlist_add,
+        label: "New playlist…",
+        onTap: () async {
+          if (!context.mounted) return;
+          String? name = await askPlaylistName(context);
+          if (name == null) return;
+          Playlist playlist = await store.createPlaylist(name, kind: kind);
+          await store.addAllToPlaylist(playlist.id, keys);
+          done("Added $count to ${playlist.name}");
+        },
+      ),
+    ],
+  );
+}
+
+Future<void> _showAddToOne(BuildContext context, {required String key, required MediaKind kind}) async {
   LibraryStore store = await LibraryStore.instance();
   if (!context.mounted) return;
   ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);

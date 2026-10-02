@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'radio_api.dart';
 import 'track_info.dart';
 
 /// How the song list is ordered.
@@ -12,6 +13,17 @@ enum SortOrder {
 
   final String label;
   const SortOrder(this.label);
+}
+
+/// How the Videos and Favourites lists on the Video tab are ordered.
+enum VideoSort {
+  newest('Newest first'),
+  oldest('Oldest first'),
+  name('Name'),
+  longest('Longest first');
+
+  final String label;
+  const VideoSort(this.label);
 }
 
 /// Whether a list holds songs or videos.
@@ -36,6 +48,9 @@ class Playlist {
         songs: (json['songs'] as List).cast<String>(),
       );
 }
+
+/// Marks a backup file as made by this app.
+const String backupMarker = 'm6player-backup';
 
 /// The user's favourites, Latest list, playlists, hidden and filtered-out
 /// items and sort choice, saved as JSON in the app's folder.
@@ -65,16 +80,21 @@ class LibraryStore extends ChangeNotifier {
 
   final File _file;
   SortOrder _sort = SortOrder.dateAdded;
+  VideoSort _videoSort = VideoSort.newest;
   final Set<String> _favourites = {};
   final List<String> _latest = []; // Newest first
   final List<Playlist> _playlists = [];
   final Set<String> _hidden = {}; // Hidden from every list
   final Set<String> _filteredOut = {}; // Removed from the Songs or Videos list only
+  final List<RadioStation> _radioFavourites = []; // Newest first
   final Map<String, int> _positions = {}; // Where each video stopped, in milliseconds
 
   SortOrder get sort => _sort;
+  VideoSort get videoSort => _videoSort;
   List<Playlist> get playlists => List.unmodifiable(_playlists);
   List<Playlist> playlistsOf(MediaKind kind) => _playlists.where((p) => p.kind == kind).toList();
+  List<RadioStation> get radioFavourites => List.unmodifiable(_radioFavourites);
+  bool isRadioFavourite(String url) => _radioFavourites.any((s) => s.url == url);
   bool isFavourite(String key) => _favourites.contains(key);
   bool isLatest(String key) => _latest.contains(key);
   bool isHidden(String key) => _hidden.contains(key);
@@ -90,17 +110,57 @@ class LibraryStore extends ChangeNotifier {
   Future<void> _load() async {
     try {
       if (!await _file.exists()) return;
-      Map<String, dynamic> json = jsonDecode(await _file.readAsString());
-      _sort = SortOrder.values.asNameMap()[json['sort']] ?? SortOrder.dateAdded;
-      _favourites.addAll((json['favourites'] as List? ?? []).cast<String>());
-      _latest.addAll((json['latest'] as List? ?? []).cast<String>());
-      _playlists.addAll((json['playlists'] as List? ?? []).map((p) => Playlist.fromJson(p)));
-      _hidden.addAll((json['hidden'] as List? ?? []).cast<String>());
-      _filteredOut.addAll((json['filteredOut'] as List? ?? []).cast<String>());
-      (json['positions'] as Map? ?? {}).forEach((key, ms) => _positions[key as String] = (ms as num).toInt());
+      _apply(jsonDecode(await _file.readAsString()));
     } catch (e) {
       debugPrint("Error loading library.json: $e"); // Start fresh rather than crash
     }
+  }
+
+  /// Replaces everything with what's in [json] (the saved file, or a backup).
+  void _apply(Map<String, dynamic> json) {
+    _sort = SortOrder.values.asNameMap()[json['sort']] ?? SortOrder.dateAdded;
+    _videoSort = VideoSort.values.asNameMap()[json['videoSort']] ?? VideoSort.newest;
+    _favourites
+      ..clear()
+      ..addAll((json['favourites'] as List? ?? []).cast<String>());
+    _latest
+      ..clear()
+      ..addAll((json['latest'] as List? ?? []).cast<String>());
+    _playlists
+      ..clear()
+      ..addAll((json['playlists'] as List? ?? []).map((p) => Playlist.fromJson(p)));
+    _hidden
+      ..clear()
+      ..addAll((json['hidden'] as List? ?? []).cast<String>());
+    _filteredOut
+      ..clear()
+      ..addAll((json['filteredOut'] as List? ?? []).cast<String>());
+    _radioFavourites
+      ..clear()
+      ..addAll((json['radioFavourites'] as List? ?? []).map((s) =>
+          RadioStation(name: s['name'] as String, url: s['url'] as String, country: s['country'] as String? ?? '')));
+    _positions.clear();
+    (json['positions'] as Map? ?? {}).forEach((key, ms) => _positions[key as String] = (ms as num).toInt());
+  }
+
+  Map<String, dynamic> toJson() => {
+        'sort': _sort.name,
+        'videoSort': _videoSort.name,
+        'favourites': _favourites.toList(),
+        'latest': _latest,
+        'playlists': _playlists.map((p) => p.toJson()).toList(),
+        'hidden': _hidden.toList(),
+        'filteredOut': _filteredOut.toList(),
+        'radioFavourites': _radioFavourites.map((s) => {'name': s.name, 'url': s.url, 'country': s.country}).toList(),
+        'positions': _positions,
+      };
+
+  /// Replaces the whole library with a backup made by [toJson]. Throws if it isn't one.
+  Future<void> restoreFrom(String backup) async {
+    Object? json = jsonDecode(backup);
+    if (json is! Map<String, dynamic> || json['app'] != backupMarker) throw FormatException("Not an M6 Player backup");
+    _apply(json);
+    await _changed();
   }
 
   Future<void> _changed() async {
@@ -110,22 +170,73 @@ class LibraryStore extends ChangeNotifier {
 
   Future<void> _save() async {
     try {
-      await _file.writeAsString(jsonEncode({
-        'sort': _sort.name,
-        'favourites': _favourites.toList(),
-        'latest': _latest,
-        'playlists': _playlists.map((p) => p.toJson()).toList(),
-        'hidden': _hidden.toList(),
-        'filteredOut': _filteredOut.toList(),
-        'positions': _positions,
-      }));
+      await _file.writeAsString(jsonEncode(toJson()));
     } catch (e) {
       debugPrint("Error saving library.json: $e");
     }
   }
 
+  /// The backup file's text: the library plus a marker so a restore can tell it's ours.
+  String backupJson() => jsonEncode({'app': backupMarker, ...toJson()});
+
+  /// Adds every key to Favourites. Returns how many were new.
+  Future<int> addAllToFavourites(Iterable<String> keys) async {
+    int before = _favourites.length;
+    _favourites.addAll(keys);
+    await _changed();
+    return _favourites.length - before;
+  }
+
+  Future<void> addAllToLatest(Iterable<String> keys) async {
+    for (String key in keys.toList().reversed) {
+      _latest.remove(key);
+      _latest.insert(0, key);
+    }
+    await _changed();
+  }
+
+  /// Adds every key to a playlist. Returns how many were new.
+  Future<int> addAllToPlaylist(String id, Iterable<String> keys) async {
+    Playlist? list = playlist(id);
+    if (list == null) return 0;
+    int added = 0;
+    for (String key in keys) {
+      if (!list.songs.contains(key)) {
+        list.songs.add(key);
+        added++;
+      }
+    }
+    await _changed();
+    return added;
+  }
+
+  Future<void> hideAll(Iterable<String> keys) async {
+    _hidden.addAll(keys);
+    await _changed();
+  }
+
+  Future<void> filterOutAll(Iterable<String> keys) async {
+    _filteredOut.addAll(keys);
+    await _changed();
+  }
+
   Future<void> setSort(SortOrder sort) async {
     _sort = sort;
+    await _changed();
+  }
+
+  Future<void> setVideoSort(VideoSort sort) async {
+    _videoSort = sort;
+    await _changed();
+  }
+
+  Future<void> toggleRadioFavourite(RadioStation station) async {
+    int at = _radioFavourites.indexWhere((s) => s.url == station.url);
+    if (at >= 0) {
+      _radioFavourites.removeAt(at);
+    } else {
+      _radioFavourites.insert(0, station);
+    }
     await _changed();
   }
 

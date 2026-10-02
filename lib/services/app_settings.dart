@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:math';
+import 'package:crypto/crypto.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -15,10 +17,13 @@ class AppSettings extends ChangeNotifier {
   bool _equalizerOn = false;
   String _equalizerPreset = 'Flat';
   List<double> _equalizerGains = []; // dB per band, lowest frequency first
+  String? _pinSalt; // The Hidden page's PIN is kept only as a salted hash
+  String? _pinHash;
 
   ThemeMode get themeMode => _themeMode;
   bool get equalizerOn => _equalizerOn;
   String get equalizerPreset => _equalizerPreset;
+  bool get hasPin => _pinHash != null;
   List<double> get equalizerGains => List.unmodifiable(_equalizerGains);
 
   /// Reads the saved settings (or keeps the defaults if there are none).
@@ -31,6 +36,8 @@ class AppSettings extends ChangeNotifier {
       _equalizerOn = json['equalizerOn'] == true;
       _equalizerPreset = json['equalizerPreset'] as String? ?? 'Flat';
       _equalizerGains = (json['equalizerGains'] as List? ?? []).map((g) => (g as num).toDouble()).toList();
+      _pinSalt = json['pinSalt'] as String?;
+      _pinHash = json['pinHash'] as String?;
       notifyListeners();
     } catch (e) {
       debugPrint("Error loading settings: $e"); // Keep the defaults
@@ -47,6 +54,8 @@ class AppSettings extends ChangeNotifier {
         'equalizerOn': _equalizerOn,
         'equalizerPreset': _equalizerPreset,
         'equalizerGains': _equalizerGains,
+        'pinSalt': _pinSalt,
+        'pinHash': _pinHash,
       }));
     } catch (e) {
       debugPrint("Error saving settings: $e");
@@ -55,6 +64,22 @@ class AppSettings extends ChangeNotifier {
 
   Future<void> setThemeMode(ThemeMode mode) async {
     _themeMode = mode;
+    await _save();
+  }
+
+  static String _hash(String salt, String pin) => sha256.convert(utf8.encode('$salt:$pin')).toString();
+
+  bool checkPin(String pin) => _pinHash == null || _hash(_pinSalt ?? '', pin) == _pinHash;
+
+  /// Sets the Hidden page's PIN; null removes it.
+  Future<void> setPin(String? pin) async {
+    if (pin == null) {
+      _pinSalt = null;
+      _pinHash = null;
+    } else {
+      _pinSalt = List.generate(16, (_) => Random.secure().nextInt(256).toRadixString(16)).join();
+      _pinHash = _hash(_pinSalt!, pin);
+    }
     await _save();
   }
 

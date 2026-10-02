@@ -3,13 +3,30 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../screens/equalizer_screen.dart';
 import '../screens/hidden_screen.dart';
+import '../screens/search_screen.dart';
 import '../screens/transfer_screen.dart';
 import '../services/app_settings.dart';
+import 'backup_sheet.dart';
 import 'options_sheet.dart';
+import 'pin_dialog.dart';
 
 /// Where the legal pages live (on msixv.com, M6V's site).
 const String privacyPolicyUrl = 'https://msixv.com/games/privacy-policy';
 const String termsUrl = 'https://msixv.com/games/terms-of-service';
+
+/// The magnifying glass in the top bar: opens the search page.
+class SearchButton extends StatelessWidget {
+  const SearchButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: "Search",
+      icon: Icon(Icons.search),
+      onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const SearchScreen())),
+    );
+  }
+}
 
 /// The ⋮ in the top bar of Music, Radio and Video: equalizer, light/dark mode,
 /// hidden & filtered items, receiving files, and the privacy policy and terms.
@@ -25,6 +42,7 @@ class AppMenuButton extends StatelessWidget {
         if (Platform.isAndroid) _item("equalizer", Icons.equalizer, "Equalizer"),
         _item("theme", Icons.brightness_6_outlined, "Light / dark mode"),
         _item("hidden", Icons.visibility_off_outlined, "Hidden & filtered"),
+        _item("backup", Icons.backup_outlined, "Back up & restore"),
         if (Platform.isAndroid) _item("receive", Icons.download_outlined, "Receive files"),
         PopupMenuDivider(),
         _item("privacy", Icons.privacy_tip_outlined, "Privacy policy"),
@@ -46,7 +64,11 @@ class AppMenuButton extends StatelessWidget {
       case "theme":
         showThemeChooser(context);
       case "hidden":
-        _push(context, const HiddenScreen());
+        unlockWithPin(context).then((ok) {
+          if (ok && context.mounted) _push(context, const HiddenScreen());
+        });
+      case "backup":
+        showBackupSheet(context);
       case "receive":
         _push(context, const TransferScreen());
       case "privacy":

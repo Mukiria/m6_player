@@ -65,9 +65,25 @@ class _VideoScreenState extends State<VideoScreen> {
 
   List<AssetEntity> get _visible => _library.videos.where((v) => !_isHidden(v)).toList();
 
-  List<AssetEntity> get _all => _visible.where((v) => !(_store?.isFilteredOut(videoKey(v.id)) ?? false)).toList();
+  VideoSort get _sort => _store?.videoSort ?? VideoSort.newest;
 
-  List<AssetEntity> get _favourites => _visible.where((v) => _store?.isFavourite(videoKey(v.id)) ?? false).toList();
+  /// [videos] (newest first, as loaded) in the chosen order.
+  List<AssetEntity> _sorted(List<AssetEntity> videos) {
+    switch (_sort) {
+      case VideoSort.newest:
+        return videos;
+      case VideoSort.oldest:
+        return videos.reversed.toList();
+      case VideoSort.name:
+        return List.of(videos)..sort((a, b) => videoTitle(a).toLowerCase().compareTo(videoTitle(b).toLowerCase()));
+      case VideoSort.longest:
+        return List.of(videos)..sort((a, b) => b.videoDuration.compareTo(a.videoDuration));
+    }
+  }
+
+  List<AssetEntity> get _all => _sorted(_visible.where((v) => !(_store?.isFilteredOut(videoKey(v.id)) ?? false)).toList());
+
+  List<AssetEntity> get _favourites => _sorted(_visible.where((v) => _store?.isFavourite(videoKey(v.id)) ?? false).toList());
 
   List<AssetEntity> get _latest => (_store?.latest ?? [])
       .map(videoIdOf)
@@ -92,11 +108,21 @@ class _VideoScreenState extends State<VideoScreen> {
           title: AppLogo(),
           centerTitle: false,
           actions: [
+            PopupMenuButton<VideoSort>(
+              tooltip: "Sort",
+              icon: Icon(Icons.sort),
+              onSelected: (sort) => _store?.setVideoSort(sort),
+              itemBuilder: (context) => [
+                for (VideoSort order in VideoSort.values)
+                  CheckedPopupMenuItem(value: order, checked: order == _sort, child: Text(order.label)),
+              ],
+            ),
             IconButton(
               tooltip: "Refresh",
               icon: Icon(Icons.refresh),
               onPressed: _library.isLoading ? null : _library.load,
             ),
+            const SearchButton(),
             const AppMenuButton(),
           ],
           bottom: TabBar(

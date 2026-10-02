@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import '../services/library_store.dart';
 import '../services/player_service.dart';
 import '../services/radio_api.dart';
 import '../widgets/app_logo.dart';
@@ -27,6 +28,8 @@ class _RadioScreenState extends State<RadioScreen> {
   bool _loadFailed = false; // Network/server error, as opposed to "no stations"
   bool _isPlaying = false;
   String? _currentRadioUrl;
+  LibraryStore? _store;
+  bool _onlyFavourites = false;
   String _userCountry = "Detecting...";
   final TextEditingController _searchController = TextEditingController(); // ✅ Search Controller
 
@@ -36,6 +39,12 @@ class _RadioScreenState extends State<RadioScreen> {
     _playerStateSubscription = _audioPlayer.playerStateStream.listen((state) {
       setState(() => _isPlaying = state.playing);
     });
+    LibraryStore.instance().then((store) {
+      if (!mounted) return;
+      store.addListener(_filterStations);
+      _store = store;
+      _filterStations();
+    }).catchError((Object e) => debugPrint("Error opening the library store: $e"));
     fetchRadioStations(_deviceCountryCode());
     _searchController.addListener(_filterStations); // ✅ Add listener for search
   }
@@ -79,7 +88,7 @@ class _RadioScreenState extends State<RadioScreen> {
   void _filterStations() {
     String query = _searchController.text.toLowerCase();
     setState(() {
-      _filteredStations = _radioStations
+      _filteredStations = (_onlyFavourites ? _store?.radioFavourites ?? [] : _radioStations)
           .where((station) => station.name.toLowerCase().contains(query))
           .toList();
     });
@@ -113,6 +122,7 @@ class _RadioScreenState extends State<RadioScreen> {
   void dispose() {
     // The player is shared and keeps playing in the background; just stop listening.
     _playerStateSubscription?.cancel();
+    _store?.removeListener(_filterStations);
     _searchController.dispose();
     super.dispose();
   }
@@ -128,7 +138,7 @@ class _RadioScreenState extends State<RadioScreen> {
           backgroundColor: Colors.transparent,
           title: AppLogo(),
           centerTitle: false,
-          actions: const [AppMenuButton()],
+          actions: const [SearchButton(), AppMenuButton()],
         ),
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -143,16 +153,36 @@ class _RadioScreenState extends State<RadioScreen> {
                 backgroundColor: WidgetStatePropertyAll(colors.surfaceContainerHighest),
               ),
             ),
-            if (!_isLoading && !_loadFailed)
+            if (!_isLoading)
               Padding(
-                padding: EdgeInsets.fromLTRB(16, 4, 16, 4),
-                child: Text("Stations in $_userCountry (${_filteredStations.length})",
-                    style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant)),
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                          _onlyFavourites
+                              ? "Favourite stations (${_filteredStations.length})"
+                              : _loadFailed
+                                  ? ""
+                                  : "Stations in $_userCountry (${_filteredStations.length})",
+                          style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant)),
+                    ),
+                    FilterChip(
+                      label: Text("Favourites"),
+                      avatar: Icon(Icons.favorite, size: 16),
+                      selected: _onlyFavourites,
+                      onSelected: (on) {
+                        _onlyFavourites = on;
+                        _filterStations();
+                      },
+                    ),
+                  ],
+                ),
               ),
             Expanded(
               child: _isLoading
                   ? Center(child: CircularProgressIndicator())
-                  : _loadFailed
+                  : _loadFailed && !_onlyFavourites
                       ? Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -173,7 +203,10 @@ class _RadioScreenState extends State<RadioScreen> {
                           ),
                         )
                       : _filteredStations.isEmpty
-                          ? Center(child: Text("No radio stations found for $_userCountry."))
+                          ? Center(
+                              child: Text(_onlyFavourites
+                                  ? "No favourite stations yet.\nTap the heart on a station to add it."
+                                  : "No radio stations found for $_userCountry.", textAlign: TextAlign.center))
                           : ListView.builder(
                               itemCount: _filteredStations.length,
                               itemBuilder: (context, index) => _stationTile(_filteredStations[index], colors),
@@ -187,6 +220,7 @@ class _RadioScreenState extends State<RadioScreen> {
 
   Widget _stationTile(RadioStation station, ColorScheme colors) {
     bool isCurrent = _currentRadioUrl == station.url && !_service.isLibraryActive;
+    bool favourite = _store?.isRadioFavourite(station.url) ?? false;
     return ListTile(
       leading: Artwork(size: 40, isRadio: true, round: true),
       title: Text(
@@ -198,9 +232,17 @@ class _RadioScreenState extends State<RadioScreen> {
           fontWeight: isCurrent ? FontWeight.w600 : null,
         ),
       ),
-      trailing: isCurrent
-          ? Icon(_isPlaying ? Icons.graphic_eq : Icons.pause, color: colors.primary)
-          : null,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isCurrent) Icon(_isPlaying ? Icons.graphic_eq : Icons.pause, color: colors.primary),
+          IconButton(
+            tooltip: favourite ? "Remove from favourites" : "Add to favourites",
+            icon: Icon(favourite ? Icons.favorite : Icons.favorite_border, color: favourite ? colors.primary : null),
+            onPressed: () => _store?.toggleRadioFavourite(station),
+          ),
+        ],
+      ),
       onTap: () => playRadio(station),
     );
   }

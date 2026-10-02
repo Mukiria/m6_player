@@ -37,8 +37,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _failed = false;
   bool _showControls = true;
   bool _isLandscape = false;
+  static const List<double> _speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+  double _speed = 1.0; // Kept from one video to the next
+  int _shape = 0; // Index into _shapes; kept from one video to the next
+  static const List<String> _shapes = ["Fit", "Fill", "16:9", "4:3"];
+  bool _locked = false; // Touch lock: only the unlock button responds
+  bool _boosting = false; // Holding a finger down plays at 2x
   Timer? _hideTimer;
   Duration? _dragPosition; // While the user drags the seek bar
+
+  // Sleep timer: pauses the video after a set time, or when this video ends
+  Timer? _sleepTimer;
+  DateTime? _sleepAt;
+  bool _sleepAtEnd = false;
+  bool get _sleepOn => _sleepAt != null || _sleepAtEnd;
 
   LibraryStore? _store;
   String? _loadedKey; // The video the controller holds, for saving its position
@@ -107,6 +119,82 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _lastSaved = position;
   }
 
+  void _cancelSleep() {
+    _sleepTimer?.cancel();
+    _sleepAt = null;
+    _sleepAtEnd = false;
+  }
+
+  void _setSleep(Duration? delay) {
+    setState(() {
+      _cancelSleep();
+      if (delay == null) {
+        _sleepAtEnd = true; // Stops the next video starting too; see _onTick
+      } else {
+        _sleepAt = DateTime.now().add(delay);
+        _sleepTimer = Timer(delay, () {
+          _controller?.pause();
+          if (mounted) setState(() => _cancelSleep());
+        });
+      }
+    });
+    _showGesture(Icons.bedtime_outlined, delay == null ? "Sleep at end" : "Sleep in ${delay.inMinutes} min");
+    _scheduleHide();
+  }
+
+  /// "12 min" left on the timer, "End", or null when it's off.
+  String? get _sleepLabel {
+    if (_sleepAtEnd) return "End";
+    DateTime? at = _sleepAt;
+    if (at == null) return null;
+    return "${(at.difference(DateTime.now()).inSeconds / 60).ceil().clamp(1, 999)} min";
+  }
+
+  /// The picture in the chosen shape: Fit (whole picture), Fill (cropped to fill the screen), or stretched to 16:9 / 4:3.
+  Widget _videoView(VideoPlayerController controller) {
+    switch (_shapes[_shape]) {
+      case "Fill":
+        return SizedBox.expand(
+          child: FittedBox(
+            fit: BoxFit.cover,
+            clipBehavior: Clip.hardEdge,
+            child: SizedBox(
+              width: controller.value.size.width,
+              height: controller.value.size.height,
+              child: VideoPlayer(controller),
+            ),
+          ),
+        );
+      case "16:9":
+        return AspectRatio(aspectRatio: 16 / 9, child: VideoPlayer(controller));
+      case "4:3":
+        return AspectRatio(aspectRatio: 4 / 3, child: VideoPlayer(controller));
+      default:
+        return AspectRatio(aspectRatio: controller.value.aspectRatio, child: VideoPlayer(controller));
+    }
+  }
+
+  void _nextShape() {
+    setState(() => _shape = (_shape + 1) % _shapes.length);
+    _showGesture(Icons.aspect_ratio, _shapes[_shape]);
+    _scheduleHide();
+  }
+
+  void _boostStart() {
+    if (_controller == null) return;
+    _boosting = true;
+    _controller!.setPlaybackSpeed(2.0);
+    _showGesture(Icons.fast_forward, "2.0x");
+  }
+
+  void _boostEnd() {
+    if (!_boosting) return;
+    _boosting = false;
+    _controller?.setPlaybackSpeed(_speed);
+  }
+
+  String _speedLabel(double speed) => speed == speed.roundToDouble() ? speed.toStringAsFixed(1) : '$speed';
+
   void _showGesture(IconData icon, String text) {
     _gestureTimer?.cancel();
     setState(() {
@@ -119,10 +207,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _dragStart(DragStartDetails details) {
+    if (_locked) return;
     _dragIsBrightness = details.localPosition.dx < MediaQuery.of(context).size.width / 2;
   }
 
   void _dragUpdate(DragUpdateDetails details) {
+    if (_locked) return;
     // A swipe across half the screen height covers the whole range
     double change = -details.delta.dy / (MediaQuery.of(context).size.height / 2);
     if (_dragIsBrightness) {
@@ -222,6 +312,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       }
       _loadedKey = key;
       _lastSaved = resumeAt ?? Duration.zero;
+      await controller.setPlaybackSpeed(_speed);
       controller.addListener(_onTick);
       setState(() => _controller = controller);
       await controller.play();
@@ -244,6 +335,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _lastSaved = Duration.zero;
     } else if ((value.position - _lastSaved).abs() >= Duration(seconds: 5)) {
       _savePosition();
+    }
+    if (ended && _sleepAtEnd) {
+      setState(() => _cancelSleep()); // Sleep timer: stay on this video
+      return;
     }
     if (ended && !_advancing && _hasNext) {
       _advancing = true;
@@ -303,6 +398,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     PlayerService.instance.videoPlaying.value = false;
     _savePosition();
     _gestureTimer?.cancel();
+    _sleepTimer?.cancel();
     ScreenBrightness().resetApplicationScreenBrightness().catchError((_) {});
     _hideTimer?.cancel();
     _carouselScroll.dispose();
@@ -323,10 +419,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         behavior: HitTestBehavior.opaque,
         onTap: _toggleControls,
         onDoubleTapDown: (details) {
+          if (_locked) return;
           double width = MediaQuery.of(context).size.width;
           _skipBy(details.localPosition.dx < width / 2 ? -_skip : _skip);
         },
         onDoubleTap: () {}, // Needed for onDoubleTapDown to fire
+        onLongPressStart: (_) => _locked ? null : _boostStart(),
+        onLongPressEnd: (_) => _boostEnd(),
+        onLongPressCancel: _boostEnd,
         onVerticalDragStart: _dragStart,
         onVerticalDragUpdate: _dragUpdate,
         child: Stack(
@@ -336,10 +436,30 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               child: _failed
                   ? Text("Couldn't play this video.", style: TextStyle(color: Colors.white70))
                   : ready
-                      ? AspectRatio(aspectRatio: controller.value.aspectRatio, child: VideoPlayer(controller))
+                      ? _videoView(controller)
                       : CircularProgressIndicator(color: brandBlueLight),
             ),
-            if (_showControls || _failed) _controls(controller, ready),
+            if (_locked && _showControls)
+              SafeArea(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: EdgeInsets.only(left: 12),
+                    child: IconButton(
+                      tooltip: "Unlock",
+                      iconSize: 32,
+                      style: IconButton.styleFrom(backgroundColor: Colors.black54),
+                      icon: Icon(Icons.lock, color: Colors.white),
+                      onPressed: () {
+                        setState(() => _locked = false);
+                        _showGesture(Icons.lock_open, "Unlocked");
+                        _scheduleHide();
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            if (!_locked && (_showControls || _failed)) _controls(controller, ready),
             if (_gestureIcon != null)
               Center(
                 child: Container(
@@ -402,7 +522,49 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   child: Text(videoTitle(_video), maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500)),
                 ),
-                SizedBox(width: 16),
+                IconButton(
+                  tooltip: "Lock touch",
+                  icon: Icon(Icons.lock_open, color: Colors.white),
+                  onPressed: () {
+                    setState(() {
+                      _locked = true;
+                      _showControls = false;
+                    });
+                    _showGesture(Icons.lock, "Locked: tap the screen to show the unlock button");
+                  },
+                ),
+                PopupMenuButton<int>(
+                  tooltip: "Sleep timer",
+                  onOpened: _hideTimer?.cancel,
+                  onCanceled: _scheduleHide,
+                  onSelected: (minutes) {
+                    if (minutes < 0) {
+                      setState(_cancelSleep);
+                      _scheduleHide();
+                    } else {
+                      _setSleep(minutes == 0 ? null : Duration(minutes: minutes));
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    if (_sleepOn) PopupMenuItem(value: -1, child: Text("Turn off sleep timer")),
+                    for (int minutes in [15, 30, 45, 60]) PopupMenuItem(value: minutes, child: Text("$minutes minutes")),
+                    PopupMenuItem(value: 0, child: Text("End of this video")),
+                  ],
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.bedtime_outlined, color: _sleepOn ? brandBlueLight : Colors.white),
+                        if (_sleepLabel != null)
+                          Padding(
+                            padding: EdgeInsets.only(left: 4),
+                            child: Text(_sleepLabel!, style: TextStyle(color: brandBlueLight, fontSize: 12)),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(width: 4),
               ],
             ),
             Spacer(),
@@ -468,6 +630,33 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     ),
                   ),
                   Text(formatDuration(duration), style: TextStyle(color: Colors.white, fontSize: 12)),
+                  InkWell(
+                    onTap: ready ? _nextShape : null,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                      child: Icon(Icons.aspect_ratio, color: Colors.white, size: 20),
+                    ),
+                  ),
+                  PopupMenuButton<double>(
+                    tooltip: "Playback speed",
+                    initialValue: _speed,
+                    onOpened: _hideTimer?.cancel,
+                    onCanceled: _scheduleHide,
+                    onSelected: (speed) {
+                      setState(() => _speed = speed);
+                      controller?.setPlaybackSpeed(speed);
+                      _showGesture(Icons.speed, "${_speedLabel(speed)}x");
+                      _scheduleHide();
+                    },
+                    itemBuilder: (context) => [
+                      for (double speed in _speeds) PopupMenuItem(value: speed, child: Text("${_speedLabel(speed)}x")),
+                    ],
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                      child: Text("${_speedLabel(_speed)}x",
+                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
                   IconButton(
                     tooltip: _isLandscape ? "Portrait" : "Landscape",
                     icon: Icon(Icons.screen_rotation, color: Colors.white),

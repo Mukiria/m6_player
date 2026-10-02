@@ -2,12 +2,15 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import '../screens/video_player_screen.dart';
+import '../services/library_store.dart';
 import '../utils/format.dart';
 import 'item_actions.dart';
+import 'playlist_picker.dart';
+import 'selection_bar.dart';
 
 /// A list of videos: all videos, favourites, Latest or a video playlist.
 /// Tapping one plays the list from there; its ⋮ opens the options sheet.
-class VideoList extends StatelessWidget {
+class VideoList extends StatefulWidget {
   final List<AssetEntity> videos;
   final ItemList from;
   final String? playlistId;
@@ -17,9 +20,54 @@ class VideoList extends StatelessWidget {
   const VideoList({super.key, required this.videos, this.from = ItemList.all, this.playlistId, this.header, this.onRefresh});
 
   @override
+  State<VideoList> createState() => _VideoListState();
+}
+
+class _VideoListState extends State<VideoList> {
+  List<AssetEntity> get videos => widget.videos;
+  ItemList get from => widget.from;
+  String? get playlistId => widget.playlistId;
+  final Set<String> _selected = {}; // Video ids picked by long-press for multi-select
+
+  List<String> get _selectedKeys => _selected.map(videoKey).toList();
+
+  void _toggleSelected(AssetEntity video) {
+    setState(() {
+      if (!_selected.remove(video.id)) _selected.add(video.id);
+    });
+  }
+
+  void _say(String text) {
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Widget _selectionBar() => SelectionBar(
+        count: _selected.length,
+        onClose: () => setState(_selected.clear),
+        onSelectAll: () => setState(() => _selected.addAll(videos.map((video) => video.id))),
+        onFavourite: () async {
+          LibraryStore store = await LibraryStore.instance();
+          int added = await store.addAllToFavourites(_selectedKeys);
+          setState(_selected.clear);
+          _say("$added added to Favourites");
+        },
+        onAddTo: () async {
+          await showAddToMany(context, keys: _selectedKeys, kind: MediaKind.video);
+          if (mounted) setState(_selected.clear);
+        },
+        onHide: () async {
+          LibraryStore store = await LibraryStore.instance();
+          List<String> keys = _selectedKeys;
+          await store.hideAll(keys);
+          setState(_selected.clear);
+          _say("${keys.length} hidden. Find them again under Hidden.");
+        },
+      );
+
+  @override
   Widget build(BuildContext context) {
+    String? header = widget.header;
     ColorScheme colors = Theme.of(context).colorScheme;
-    String? header = this.header;
     Widget list = ListView.builder(
       padding: EdgeInsets.only(bottom: 8),
       itemCount: videos.length + (header == null ? 0 : 1),
@@ -33,18 +81,26 @@ class VideoList extends StatelessWidget {
         return _tile(context, index - (header == null ? 0 : 1), colors);
       },
     );
-    Future<void> Function()? refresh = onRefresh;
-    return refresh == null ? list : RefreshIndicator(onRefresh: refresh, child: list);
+    Future<void> Function()? refresh = widget.onRefresh;
+    Widget body = refresh == null ? list : RefreshIndicator(onRefresh: refresh, child: list);
+    if (_selected.isEmpty) return body;
+    return Column(children: [Expanded(child: body), _selectionBar()]);
   }
 
   Widget _tile(BuildContext context, int index, ColorScheme colors) {
     AssetEntity video = videos[index];
     String title = videoTitle(video);
+    bool selected = _selected.contains(video.id);
     return InkWell(
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(
-        builder: (context) => VideoPlayerScreen(videos: videos, index: index),
-      )),
-      child: Padding(
+      onTap: () => _selected.isNotEmpty
+          ? _toggleSelected(video)
+          : Navigator.of(context).push(MaterialPageRoute(
+              builder: (context) => VideoPlayerScreen(videos: videos, index: index),
+            )),
+      onLongPress: () => _toggleSelected(video),
+      child: Container(
+        color: selected ? colors.primary.withValues(alpha: 0.12) : null,
+        child: Padding(
         padding: EdgeInsets.only(left: 16, top: 6, bottom: 6),
         child: Row(
           children: [
@@ -70,6 +126,7 @@ class VideoList extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

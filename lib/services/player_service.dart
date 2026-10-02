@@ -119,6 +119,23 @@ class PlayerService {
     _queuePaths.add(file.path);
   }
 
+  /// Queue editing from the Up next sheet. Positions are in the playlist's own
+  /// order (not the shuffled one). The playing list no longer matches the one
+  /// on screen afterwards.
+  Future<void> moveTrack(int from, int to) async {
+    if (!isLibraryActive || from == to || from < 0 || to < 0 || from >= _queuePaths.length || to >= _queuePaths.length) return;
+    _queuePaths.insert(to, _queuePaths.removeAt(from));
+    queueId = '${queueId ?? 'custom'}+';
+    await player.moveAudioSource(from, to);
+  }
+
+  Future<void> removeTrackAt(int index) async {
+    if (!isLibraryActive || index < 0 || index >= _queuePaths.length) return;
+    _queuePaths.removeAt(index);
+    queueId = '${queueId ?? 'custom'}+';
+    await player.removeAudioSourceAt(index);
+  }
+
   /// A song was deleted from the library: take it out of the playing
   /// playlist if it's there (whichever list that is).
   Future<void> removeTrack(File file) async {

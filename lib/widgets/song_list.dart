@@ -5,6 +5,8 @@ import '../services/library_store.dart';
 import '../services/player_service.dart';
 import '../services/track_info.dart';
 import 'artwork.dart';
+import 'playlist_picker.dart';
+import 'selection_bar.dart';
 import 'item_actions.dart';
 
 /// A list of songs: all songs, favourites, Latest or one playlist. Tapping a
@@ -38,6 +40,7 @@ class _SongListState extends State<SongList> {
   LibraryStore? _store;
 
   String? _currentPath; // The song playing now
+  final Set<String> _selected = {}; // Paths picked by long-press for multi-select
   bool _isPlaying = false;
 
   /// Every row is this tall, so a song's position in the list is known exactly.
@@ -100,6 +103,39 @@ class _SongListState extends State<SongList> {
     }
   }
 
+  void _toggleSelected(File song) {
+    setState(() {
+      if (!_selected.remove(song.path)) _selected.add(song.path);
+    });
+  }
+
+  List<String> get _selectedKeys => _selected.map((path) => songKey(File(path))).toList();
+
+  void _say(String text) {
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Widget _selectionBar() => SelectionBar(
+        count: _selected.length,
+        onClose: () => setState(_selected.clear),
+        onSelectAll: () => setState(() => _selected.addAll(widget.songs.map((song) => song.path))),
+        onFavourite: () async {
+          int added = await _store?.addAllToFavourites(_selectedKeys) ?? 0;
+          setState(_selected.clear);
+          _say("$added added to Favourites");
+        },
+        onAddTo: () async {
+          await showAddToMany(context, keys: _selectedKeys, kind: MediaKind.audio);
+          if (mounted) setState(_selected.clear);
+        },
+        onHide: () async {
+          List<String> keys = _selectedKeys;
+          await _store?.hideAll(keys);
+          setState(_selected.clear);
+          _say("${keys.length} hidden. Find them again under Hidden.");
+        },
+      );
+
   /// Tapping a song plays it; tapping the current song pauses or resumes it.
   Future<void> _togglePlay(int index) async {
     File song = widget.songs[index];
@@ -138,6 +174,7 @@ class _SongListState extends State<SongList> {
             ),
           ),
         ),
+        if (_selected.isNotEmpty) _selectionBar(),
       ],
     );
   }
@@ -147,11 +184,21 @@ class _SongListState extends State<SongList> {
     TrackInfo info = _tracks.infoFor(song);
     bool isCurrent = _currentPath == song.path;
     bool isFavourite = _store?.isFavourite(songKey(song)) ?? false;
+    bool selected = _selected.contains(song.path);
     return ListTile(
       contentPadding: EdgeInsets.only(left: 16, right: 4),
+      selected: selected,
+      selectedTileColor: colors.primary.withValues(alpha: 0.12),
       leading: Stack(
         children: [
           Artwork(size: 48, coverPath: info.coverPath),
+          if (selected)
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(color: colors.primary.withValues(alpha: 0.8), borderRadius: BorderRadius.circular(48 * 0.08)),
+              child: Icon(Icons.check, color: colors.onPrimary),
+            ),
           // The playing song gets an equaliser (or pause) badge over its cover.
           if (isCurrent)
             Container(
@@ -183,7 +230,8 @@ class _SongListState extends State<SongList> {
           ),
         ],
       ),
-      onTap: () => _togglePlay(index),
+      onTap: () => _selected.isNotEmpty ? _toggleSelected(song) : _togglePlay(index),
+      onLongPress: () => _toggleSelected(song),
       trailing: IconButton(
         tooltip: "More",
         icon: Icon(Icons.more_vert),
