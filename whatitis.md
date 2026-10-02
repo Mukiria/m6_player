@@ -1,53 +1,62 @@
-# m6 player: what it is
+# M6 Player: what it is
 
 ## The project
 
-**m6 player** is a Flutter music app for Android and iOS, built by Mukiria Six Ventures.
+**M6 Player** (renamed from "m6 player" on 2026-10-02) is a Flutter music, radio and video app for Android and iOS, built by Mukiria Six Ventures. Its layout is modelled on Visha Player (Transsion's default player), with M6's own logo and colours.
 
-- **Music**: add MP3s from the device and play them as a playlist with next/previous, shuffle, repeat (off / all / one) and a seek bar. Songs are copied into the app's own library folder, so the list survives restarts, and removing a song never touches the original file.
-- **Radio**: popular stations for the user's country (from the phone's region setting) via [radio-browser.info](https://www.radio-browser.info), with search.
-- **Background playback**: audio keeps playing when the app is in the background, with lock-screen and notification controls.
+- **Music**: add MP3s or whole folders; songs are copied into the app's library (the originals are untouched). Titles, artists and cover art come from the MP3 tags. Songs · Favourites · Latest · Playlists tabs, sorting (date added, title, artist), play next / play last, shuffle, repeat, sleep timer. The playing song scrolls to the top of its list.
+- **Radio**: popular stations for the phone's country via [radio-browser.info](https://www.radio-browser.info), with search.
+- **Video**: every video on the phone (nothing copied), with Videos · Favourites · Latest · Playlists, an up-next queue and a full-screen player.
+- **Each item's ⋮** opens a frosted options sheet: play next/last, file transfer, favourite, share, add to, hide, filter out, info, delete.
+- **File transfer** between two phones running M6 Player over Wi-Fi Direct (Android), or **Share** to any phone.
+- **Playback**: background audio with notification, lock-screen and headset controls; equalizer (Android); the logo animates while something plays.
+- **Top-bar ⋮**: Equalizer, Light / dark mode, Hidden & filtered, Receive files, Privacy policy, Terms of service (EULA).
 
 | | |
 |---|---|
 | App ID | `com.msixv.com.m6player` (fixed, do not change) |
-| Theme | Brand blue from the logo: accent `#3B82F6` (`#2563EB` on light, `#60A5FA` on dark), navy `#0B1533` for dark mode. Changed from orange `#F1552C` on 2026-10-01 to match the new logo; the bottom nav bar stays brand orange `#F1552C` (white icons) in both themes |
-| Logos | Source SVGs in `branding/` (from `M6ix/m6 player/`); `node branding/make-icons.js` regenerates `assets/branding/logo-{light,dark}.svg` and all app icons; `node branding/make-logo-animation.js` regenerates the animated logo's data |
+| Name | "M6 Player" (Android `android:label`, iOS `CFBundleDisplayName`) |
+| Theme | Brand blue from the logo: accent `#3B82F6` (`#2563EB` on light, `#60A5FA` on dark), navy `#0B1533` for dark mode; the bottom nav bar is brand orange `#F1552C` with white icons. Light / dark mode follows the phone unless chosen under ⋮ |
+| Logos | Source SVGs in `branding/` (from `M6ix/m6 player/`); `node branding/make-icons.js` regenerates `assets/branding/logo-{light,dark}.svg`, all app icons and the notification's m6 button; `node branding/make-logo-animation.js` regenerates the animated logo's data |
+| Backgrounds | `assets/backgrounds/`: `music.jpg` (Music tab), `radio.jpg` (Radio tab), `transfer.jpg` (file transfer page) |
+| Legal | Privacy policy https://msixv.com/games/privacy-policy · Terms (EULA) https://msixv.com/games/terms-of-service |
 | Repo | https://github.com/Mukiria/m6_player (branch `master`) |
-| Platforms | Android, iOS 14.0+ |
+| Platforms | Android, iOS 14.0+ (equalizer and file transfer are Android only) |
 | Background audio | `audio_service` + `just_audio`, via `lib/services/audio_handler.dart` (notification, lock screen, headset buttons) |
-| Flutter | 3.44+ required; CI builds on the latest stable (3.47.5 as of 2026-09-29) |
+| Flutter | 3.44+ required; CI builds on the latest stable (3.47.5 as of 2026-09-29). Can't be built on the owner's Mac (macOS 12, Flutter 3.29): **all builds and tests run on GitHub Actions** |
+| Test phone | itel S667LN, Android 13 (connect over USB; `adb` is at `~/Library/Android/sdk/platform-tools`) |
 
-Main code: `lib/screens/` (home with the nav bar, music, radio, now playing), `lib/widgets/` (logo, mini player, artwork), `lib/services/` (shared audio player, radio API), `lib/utils/` (file handling, formatting), `lib/theme.dart` (light and dark themes). Unit tests are in `test/`.
+**Main code**
+- `lib/screens/`: home (nav bar), music, radio, video, now playing, playlist, video player, equalizer, hidden & filtered, file transfer.
+- `lib/widgets/`: logo (and its animation), mini player, artwork, song and video lists, options sheet and item actions, add-to picker, top-bar menu, tab background.
+- `lib/services/`: player (`player_service.dart`), notification handler, music and video libraries, track tags, library store (`library.json`: favourites, Latest, playlists, hidden, filtered, sort), app settings (`settings.json`: light/dark, equalizer), radio API, Wi-Fi Direct and the transfer protocol.
+- `android/app/src/main/java/com/msixv/com/m6player/`: `MainActivity.java` (permissions, open app, device name) and `WifiDirect.java`.
+- Tests in `test/` (48 as of 2026-10-02): file helpers, tags, library store and sorting, settings and presets, the transfer protocol, and widget tests with fake audio plugin channels.
 
-**Design**: modelled on Visha Player's layout (Transsion's default player): clean light list screens, a bottom nav bar, a mini player above it, and a dark full-screen Now Playing. Uses m6's own logo and colours, not Visha's branding.
-
-## Where it stands (2026-10-01)
+## Where it stands (2026-10-02)
 
 **Done**
 - Cleaned up dead code, unused files and packages; dropped the desktop and web targets.
 - Upgraded to the latest Flutter toolchain: Gradle 9.3.1, AGP 9.1.0, Kotlin 2.4.0, and current package versions.
-- GitHub Actions CI (`.github/workflows/build.yml`) on every push to `master`: analyze, unit tests, release APK (downloadable as the `m6player-apk` artifact) and an unsigned iOS build. Failures show up as annotations on the run.
-- Rebuilt playback around one shared player: background audio, a native playlist, and a working Next button.
-- Fixed the radio: the old server was dead, and it no longer uses plain-HTTP IP geolocation.
-- Safe delete with confirmation; the layout now respects the phone's safe area.
+- GitHub Actions CI (`.github/workflows/build.yml`) on every push to `master`: analyze, unit tests, release APK (downloadable as the `m6player-apk` artifact) and an unsigned iOS build. Failures show up as annotations on the run. A stale `pubspec.lock` is reported as gzip+base64 annotation parts that can be decoded and committed.
 - Release signing via `android/key.properties`. The upload keystore is at `~/keystores/m6player-upload-keystore.jks`. It's gitignored and must never be committed.
+- Everything in the to-do list below marked done.
 
 **Status**
-- Everything is committed and pushed. The latest CI run on `master` (commit `5d84812`, 2026-10-01: Visha-style redesign, new logo and icons, video tab, folder import) passed on Android and iOS: analyze, 20 tests, release APK (56.6 MB) and the unsigned iOS build.
-- Nothing has been tested on a real phone yet.
+- `6ae6212` (equalizer, light/dark mode, legal links, playing song on top) built on iOS, but 1 of 48 Android tests failed: the new top-bar menu's rows overflowed their 256 px width with the longest label ("Terms of service (EULA)"). Fixed in the next commit (labels can wrap), along with `pubspec.lock` from CI. The last fully green run is `da12991` (Wi-Fi Direct transfer, rename): 44 tests, release APK (60.2 MB), unsigned iOS build.
+- **Checked on the itel S667LN**: the new look, playback, headset buttons, the notification and its buttons, lock screen. **Not yet checked on a phone**: the equalizer, light/dark mode switch, the playing song scrolling to the top, the options sheet buttons, swiping the app away, and file transfer (needs two Android phones).
 
 ## To do
 
 - [x] **5. Radio error handling**: a failed load now shows "Couldn't load radio stations" with a **Retry** button instead of looking like "no stations". Stations that can't play (HTTP-only) and duplicate streams are hidden.
-- [x] **6. App icon and name**: `assets/logo.png` is now the Android icon (including the adaptive icon) and all iOS icons, and the home-screen label is "m6 player".
+- [x] **6. App icon and name**: first icon from `assets/logo.png`, label "m6 player" (both since replaced: see items 14 and 23).
 - [x] Commit and push the batch; CI passed (`5a775fe`).
 - [x] **7. Widget tests**: `test/widget_test.dart` loads the home screen with fake audio plugin channels (tabs, add menu, radio retry, Music tabs and sort menu, logo per theme).
 - [x] **8. Play next song always works**: Next after the last song now wraps to the first (in shuffle order when shuffle is on); Play after the playlist has finished starts again from the first song; Previous restarts the song if it's more than 3 s in. Songs ending on their own advance through just_audio's playlist (stops after the last song unless repeat is on). Adding and removing songs keep the playlist in step with the list. *Still to check on a real phone.*
 - [x] **9. Add folders and multiple items at once**: the + button offers "Choose songs" (several MP3s at once) or "Add a folder" (every MP3 in it and its subfolders). Songs already in the library (same name and size) are skipped. Adding a folder on Android asks for the audio permission (`READ_MEDIA_AUDIO`, or storage on Android 12 and older), through `photo_manager` (`permission_handler` was dropped: its Android part needs compile SDK 37). *Still to check on a real phone, including iOS folder access.*
 - [x] **10. Video section**: a Video tab listing every video on the phone (newest first, with thumbnail, length and resolution), via `photo_manager`; nothing is copied. Tapping one opens a full-screen player (`video_player`): tap to show controls, double-tap left/right to skip 10 s, seek bar, previous/next video, rotate button, and the next video plays when one ends. Music pauses when a video starts. Permissions: Android `READ_MEDIA_VIDEO` + `READ_MEDIA_VISUAL_USER_SELECTED` (no photo permission), iOS `NSPhotoLibraryUsageDescription`. The permission prompt appears only when the Video tab is first opened. **Play Console**: the video permission needs the "Photo and video permissions" declaration (core use: video player).
-- [x] **11. Headphone controls** (confirmed working on a phone, 2026-10-01): already provided by the packages: `just_audio_background` routes wired/Bluetooth headset buttons (play/pause, next, previous), and just_audio pauses when headphones are unplugged (`handleInterruptions`, on by default). Needs checking on a real phone only.
-- [x] **12. Notification panel fix (2026-10-01)**: the controls didn't show on a real phone. Android 13+ needs the notification permission, which the app never asked for: `POST_NOTIFICATIONS` is now declared and requested the first time something plays (`MainActivity.java`, a small `AudioServiceActivity` subclass with a `com.msixv.com.m6player/notifications` channel). The notification also has a proper white small icon (`res/drawable/ic_stat_m6.xml`) and the brand-blue colour. **Real cause (found 2026-10-01 from the itel S667LN's logcat):** the release build's resource shrinker deleted audio_service's button icons (`drawable/audio_service_*`, looked up by name only), so audio_service threw "You must specify an icon resource id to build a CustomAction" and never posted the notification. `res/raw/keep.xml` now keeps them. Media notifications don't need the notification permission on Android 13, so they should show even with notifications off. *Check on the phone again.*
+- [x] **11. Headphone controls** (confirmed working on a phone, 2026-10-01): headset buttons (play/pause, next, previous) go through `audio_service` (now `M6AudioHandler`, item 19), and just_audio pauses when headphones are unplugged (`handleInterruptions`, on by default).
+- [x] **12. Notification panel fix (2026-10-01)**: the controls didn't show on a real phone. Android 13+ needs the notification permission, which the app never asked for: `POST_NOTIFICATIONS` is now declared and requested the first time something plays (`MainActivity.java`, a small `AudioServiceActivity` subclass with a `com.msixv.com.m6player/notifications` channel). The notification also has a proper white small icon (`res/drawable/ic_stat_m6.xml`) and the brand-blue colour. **Real cause (found 2026-10-01 from the itel S667LN's logcat):** the release build's resource shrinker deleted audio_service's button icons (`drawable/audio_service_*`, looked up by name only), so audio_service threw "You must specify an icon resource id to build a CustomAction" and never posted the notification. `res/raw/keep.xml` now keeps them. Media notifications don't need the notification permission on Android 13, so they should show even with notifications off. **Confirmed working on the itel (2026-10-01).**
 - [x] **13. Navigation bar**: bottom nav bar with Music, Radio and Video.
 - [x] **14. New logos and icons (2026-10-01)**: the blue m6 player logo in the app bar (light and dark versions), and new Android (including adaptive) and iOS icons from `m6-player-app-icon-square.svg`. The old orange logo, background photos and fonts were removed.
 - [x] **15. Visha-style redesign (2026-10-01)**: Music and Radio tabs as clean lists (the playing item in blue with an equaliser icon, a ⋮ menu with Play and Remove), a mini player above the nav bar, a dark Now Playing screen (seek bar, shuffle, previous, play, next, repeat, and an Up next list), and dark mode following the phone. The volume buttons were dropped (the phone's volume keys do that).
@@ -69,6 +78,7 @@ Main code: `lib/screens/` (home with the nav bar, music, radio, now playing), `l
     - **Equalizer** (`lib/screens/equalizer_screen.dart`): on/off, presets (Flat, Bass boost, Treble boost, Vocal, Rock, Pop, Jazz, Classical) and a slider per band, using just_audio's `AndroidEqualizer` in the player's audio pipeline. Android only makes it available once something has played, so the screen asks to play first; saved settings are applied automatically every time after that.
     - Settings (light/dark mode, equalizer) are saved in `<app documents>/settings.json` (`lib/services/app_settings.dart`).
     - **Playing song on top**: in every song list, next/previous (or a song ending) smoothly scrolls the playing song to the top; opening a list or re-sorting puts it there too. Rows are a fixed 72 px, with room under the last song so any song can reach the top.
-- [ ] Test on a real phone: background playback, lock-screen controls, the playlist, adding and removing songs, and the radio.
+- [ ] **Test on a phone**: the equalizer, light/dark mode, the playing song scrolling to the top, every options sheet button, swiping the app away, and adding a folder. File transfer needs a second Android phone with M6 Player.
+- [ ] **Play Console** before publishing: the "Photo and video permissions" declaration (reading videos; core use: video player), and check the data-safety form now that the app uses nearby Wi-Fi devices (file transfer) and opens web links.
 - [ ] Back up the release keystore and `android/key.properties` (for example in a password manager).
 - [ ] Later: iOS distribution (TestFlight or App Store) needs an Apple Developer account and signing set up.

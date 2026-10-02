@@ -35,7 +35,8 @@ class AppMenuButton extends StatelessWidget {
 
   PopupMenuItem<String> _item(String value, IconData icon, String label) => PopupMenuItem(
         value: value,
-        child: Row(children: [Icon(icon, size: 20), SizedBox(width: 12), Text(label)]),
+        // Flexible: a long label (or large text setting) wraps instead of overflowing the menu.
+        child: Row(children: [Icon(icon, size: 20), SizedBox(width: 12), Flexible(child: Text(label))]),
       );
 
   void _open(BuildContext context, String action) {
