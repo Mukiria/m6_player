@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'app_settings.dart';
@@ -152,20 +151,6 @@ class PlayerService {
         Uri.parse(url),
         tag: MediaItem(id: url, title: title, album: 'Radio', extras: {'radio': true}),
       );
-
-  /// Asks Android 13+ for the notification permission (see MainActivity.java),
-  /// once per app run, when the app opens rather than as the first song starts,
-  /// so the system prompt can't land in the middle of starting playback.
-  static const MethodChannel _notifications = MethodChannel('com.msixv.com.m6player/notifications');
-  bool _askedForNotifications = false;
-
-  void askForNotifications() {
-    if (_askedForNotifications || !Platform.isAndroid) return;
-    _askedForNotifications = true;
-    _notifications.invokeMethod('request').catchError((Object e) {
-      debugPrint("Couldn't ask for the notification permission: $e");
-    });
-  }
 
   /// True while the player holds songs (as opposed to a radio stream).
   bool isLibraryActive = false;

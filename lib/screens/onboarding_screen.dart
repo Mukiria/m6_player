@@ -21,7 +21,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     ("Handy touches",
         "Long-press any song or video to select several at once. In the video player, swipe the left side for brightness and the right for volume, double-tap to skip 10 seconds, and hold to play at 2x."),
     ("Permissions",
-        "M6 Player may ask to show playback controls in your notifications, and to see the videos on your phone. They're only used to play your media. Your music, videos and playlists stay on your phone. The only things that go online are radio: looking up stations and streaming them."),
+        "M6 Player may ask to see the videos on your phone. They're only used to play your media. Your music, videos and playlists stay on your phone. The only things that go online are radio: looking up stations and streaming them."),
   ];
 
   int _page = 0;
