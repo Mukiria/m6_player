@@ -13,18 +13,17 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  static const List<(IconData, String, String)> _pages = [
-    (Icons.library_music_outlined, "Music, videos and radio",
+  static const List<(String, String)> _pages = [
+    ("Music, videos and radio",
         "Play your songs, watch the videos on your phone and listen to radio stations from around the world, all in one app."),
-    (Icons.add_circle_outline, "Add your music",
+    ("Add your music",
         "Tap + on the Music tab to add MP3s or a whole folder. Songs are copied into M6 Player, so deleting one here never touches the original."),
-    (Icons.touch_app_outlined, "Handy touches",
+    ("Handy touches",
         "Long-press any song or video to select several at once. In the video player, swipe the left side for brightness and the right for volume, double-tap to skip 10 seconds, and hold to play at 2x."),
-    (Icons.notifications_none, "Permissions",
+    ("Permissions",
         "M6 Player may ask to show playback controls in your notifications, and to see the videos on your phone. They're only used to play your media. Your music, videos and playlists stay on your phone. The only things that go online are radio: looking up stations and streaming them."),
   ];
 
-  final PageController _controller = PageController();
   int _page = 0;
 
   Future<void> _finish() async {
@@ -32,10 +31,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (mounted) Navigator.of(context).pop();
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  Widget _step(String title, String text) {
+    return Column(
+      children: [
+        Text(title,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white)),
+        SizedBox(height: 4),
+        Text(text,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, height: 1.3, color: Colors.white.withValues(alpha: 0.9))),
+      ],
+    );
   }
 
   @override
@@ -43,7 +50,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     bool last = _page == _pages.length - 1;
     // White top with Jacinta, brand-blue panel below with the steps (same in light and dark mode)
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFFDFDFD),
       body: Column(
         children: [
           Expanded(
@@ -61,15 +68,39 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                   // The animated logo (light version, as it sits on white) stays above every page
                   AppLogo(height: 56, alwaysAnimate: true, forceLight: true),
+                  // Jacinta sits right on the card's edge, with the page dots over the bottom of her photo
                   Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: Image.asset(
-                        'assets/brand_ambassador/jacinta-m6-player.jpg',
-                        fit: BoxFit.contain,
-                        alignment: Alignment.bottomCenter,
-                        semanticLabel: "Jacinta, the M6 brand ambassador, dancing with headphones",
-                      ),
+                    child: Stack(
+                      alignment: Alignment.bottomCenter,
+                      children: [
+                        Positioned.fill(
+                          child: Image.asset(
+                            'assets/brand_ambassador/jacinta-m6-player.jpg',
+                            fit: BoxFit.contain,
+                            alignment: Alignment.bottomCenter,
+                            semanticLabel: "Jacinta, the M6 brand ambassador, dancing with headphones",
+                          ),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.only(bottom: 14),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (int i = 0; i < _pages.length; i++)
+                                AnimatedContainer(
+                                  duration: Duration(milliseconds: 200),
+                                  margin: EdgeInsets.symmetric(horizontal: 3),
+                                  width: i == _page ? 20 : 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: i == _page ? brandOrange : brandOrange.withValues(alpha: 0.4),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -83,68 +114,45 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
             child: SafeArea(
               top: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    height: 250,
-                    child: PageView.builder(
-                      controller: _controller,
-                      itemCount: _pages.length,
-                      onPageChanged: (page) => setState(() => _page = page),
-                      itemBuilder: (context, index) {
-                        var (icon, title, text) = _pages[index];
-                        return Padding(
-                          padding: EdgeInsets.fromLTRB(32, 24, 32, 0),
-                          child: SingleChildScrollView(
-                            child: Column(
-                              children: [
-                                Icon(icon, size: 36, color: brandOrange),
-                                SizedBox(height: 12),
-                                Text(title,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: Colors.white)),
-                                SizedBox(height: 8),
-                                Text(text,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(fontSize: 15, height: 1.4, color: Colors.white.withValues(alpha: 0.9))),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+              child: GestureDetector(
+                // Swipe left / right between the steps
+                onHorizontalDragEnd: (details) {
+                  double v = details.primaryVelocity ?? 0;
+                  if (v < -200 && _page < _pages.length - 1) setState(() => _page++);
+                  if (v > 200 && _page > 0) setState(() => _page--);
+                },
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(24, 24, 24, 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      for (int i = 0; i < _pages.length; i++)
-                        AnimatedContainer(
-                          duration: Duration(milliseconds: 200),
-                          margin: EdgeInsets.all(4),
-                          width: i == _page ? 20 : 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: i == _page ? Colors.white : Colors.white38,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
+                      // All steps share one spot, so the card is as tall as the longest and doesn't jump
+                      Stack(
+                        alignment: Alignment.topCenter,
+                        children: [
+                          for (int i = 0; i < _pages.length; i++)
+                            AnimatedOpacity(
+                              duration: Duration(milliseconds: 200),
+                              opacity: i == _page ? 1 : 0,
+                              child: ExcludeSemantics(
+                                excluding: i != _page,
+                                child: _step(_pages[i].$1, _pages[i].$2),
+                              ),
+                            ),
+                        ],
+                      ),
+                      SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: brandBlueDark),
+                          onPressed: last ? _finish : () => setState(() => _page++),
+                          child: Text(last ? "Get started" : "Next"),
                         ),
+                      ),
                     ],
                   ),
-                  Padding(
-                    padding: EdgeInsets.all(24),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: brandBlueDark),
-                        onPressed: last
-                            ? _finish
-                            : () => _controller.nextPage(duration: Duration(milliseconds: 250), curve: Curves.easeOut),
-                        child: Text(last ? "Get started" : "Next"),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
