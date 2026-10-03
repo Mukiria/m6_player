@@ -8,6 +8,7 @@ import '../utils/file_helper.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/app_menu.dart';
 import '../widgets/item_actions.dart';
+import '../widgets/m6_icon.dart';
 import '../widgets/music_browse.dart';
 import '../widgets/pill_tab_bar.dart';
 import '../widgets/playlist_cover.dart';
@@ -35,6 +36,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
   final PlayerService _service = PlayerService.instance;
   LibraryStore? _store;
   bool _isImporting = false;
+  TabController? _tabController; // The Songs / Browse / … tabs, to switch to Songs after adding
 
   @override
   void initState() {
@@ -153,14 +155,31 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
 
   Future<void> _import(List<File> picked) async {
     if (picked.isEmpty) return;
+    Set<String> before = _library.songs.map((song) => song.path).toSet();
     setState(() => _isImporting = true);
     final (int added, int skipped) = await _library.importSongs(picked);
     if (!mounted) return;
     setState(() => _isImporting = false);
+    if (added > 0) _playNewSongs(before);
     if (picked.length > 1 || skipped > 0) {
       String message = "Added $added ${added == 1 ? "song" : "songs"}";
       if (skipped > 0) message += " ($skipped already in your library)";
       _showMessage(message);
+    }
+  }
+
+  /// Plays what was just added, even if something else is playing: shows the
+  /// Songs tab and starts the list at the first of the new songs (the list then
+  /// scrolls to it, as it does for any song that starts playing).
+  Future<void> _playNewSongs(Set<String> before) async {
+    List<File> songs = _sortedSongs;
+    int index = songs.indexWhere((song) => !before.contains(song.path));
+    if (index < 0) return;
+    _tabController?.animateTo(0);
+    try {
+      await _service.playQueue(PlayerService.allSongsQueue, songs, index);
+    } catch (e) {
+      debugPrint("Error playing the new songs: $e");
     }
   }
 
@@ -181,7 +200,9 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
       image: 'assets/backgrounds/music.jpg',
       child: DefaultTabController(
         length: 5,
-        child: Scaffold(
+        child: Builder(builder: (context) {
+          _tabController = DefaultTabController.of(context);
+          return Scaffold(
           backgroundColor: Colors.transparent,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
@@ -224,7 +245,8 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
               _playlistsTab(colors),
             ],
           ),
-        ),
+          );
+        }),
       ),
     );
   }
@@ -256,7 +278,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
     if (favourites.isEmpty) {
       return _message(
         colors,
-        icon: Icons.favorite_border,
+        m6Icon: 'heart',
         title: "No favourites yet",
         text: "Tap the heart on Now Playing, or use a song's ⋮ menu.",
       );
@@ -274,7 +296,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
     if (latest.isEmpty) {
       return _message(
         colors,
-        icon: Icons.fiber_new_outlined,
+        m6Icon: 'new',
         title: "Nothing in Latest yet",
         text: "Use a song's ⋮ menu, Add to…, Latest.",
       );
@@ -325,14 +347,14 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
   }
 
   Widget _message(ColorScheme colors,
-      {required IconData icon, required String title, required String text, Widget? button}) {
+      {IconData? icon, String? m6Icon, required String title, required String text, Widget? button}) {
     return Center(
       child: Padding(
         padding: EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 64, color: colors.onSurfaceVariant),
+            m6Icon != null ? M6Icon(m6Icon, size: 64) : Icon(icon, size: 64, color: colors.onSurfaceVariant),
             SizedBox(height: 16),
             Text(title, style: TextStyle(fontSize: 18)),
             SizedBox(height: 4),

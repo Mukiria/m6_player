@@ -91,13 +91,22 @@ class LibraryStore extends ChangeNotifier {
   static LibraryStore? get loaded => _instance;
 
   /// The app-wide store, loaded from disk on first use.
-  static Future<LibraryStore> instance() async {
-    if (_instance == null) {
+  static Future<LibraryStore> instance() {
+    // One shared opening: screens that ask at the same moment must get the same
+    // store, or a change made through one copy never reaches the others.
+    return _opening ??= () async {
       Directory docs = await getApplicationDocumentsDirectory();
-      _instance = await LibraryStore.open(File('${docs.path}/library.json'));
-    }
-    return _instance!;
+      LibraryStore store = await LibraryStore.open(File('${docs.path}/library.json'));
+      _instance = store;
+      return store;
+    }()
+        .catchError((Object e) {
+      _opening = null; // Try again next time rather than keep a failure
+      throw e;
+    });
   }
+
+  static Future<LibraryStore>? _opening;
 
   /// A store saved in [file] (tests use a temporary file).
   static Future<LibraryStore> open(File file) async {
@@ -107,6 +116,9 @@ class LibraryStore extends ChangeNotifier {
   }
 
   final File _file;
+
+  /// Goes up each time a play is counted (see recordPlay).
+  final ValueNotifier<int> playsVersion = ValueNotifier(0);
   SortOrder _sort = SortOrder.dateAdded;
   VideoSort _videoSort = VideoSort.newest;
   final Set<String> _favourites = {};
@@ -413,6 +425,7 @@ class LibraryStore extends ChangeNotifier {
   /// Counts a play of a song or video. Saves quietly: lists don't re-sort under you while you listen.
   Future<void> recordPlay(String key) async {
     _plays[key] = (playCount(key) + 1, DateTime.now().millisecondsSinceEpoch);
+    playsVersion.value++; // Lets Home's Continue listening refresh without re-sorting the other lists
     await _save();
   }
 

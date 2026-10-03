@@ -40,6 +40,7 @@ class _HomeTabState extends State<HomeTab> {
     LibraryStore.instance().then((store) {
       if (!mounted) return;
       store.addListener(_onChanged);
+      store.playsVersion.addListener(_onChanged);
       setState(() => _store = store);
     }).catchError((Object e) => debugPrint("Error opening the library store: $e"));
   }
@@ -50,6 +51,7 @@ class _HomeTabState extends State<HomeTab> {
   void dispose() {
     _library.removeListener(_onChanged);
     _store?.removeListener(_onChanged);
+    _store?.playsVersion.removeListener(_onChanged);
     super.dispose();
   }
 
