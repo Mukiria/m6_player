@@ -36,5 +36,6 @@ flutter:
 
   assets:
     - assets/branding/
+    - assets/icons/
     - assets/backgrounds/
     - assets/brand_ambassador/

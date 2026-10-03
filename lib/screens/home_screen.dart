@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/app_settings.dart';
 import '../theme.dart';
+import '../widgets/m6_icon.dart';
 import '../widgets/mini_player.dart';
 import 'home_tab.dart';
 import 'music_player_screen.dart';
@@ -35,11 +36,12 @@ class _HomeScreenState extends State<HomeScreen> {
   /// every switch (or when the phone turns between portrait and landscape).
   final GlobalKey _tabsKey = GlobalKey();
 
-  static const List<(IconData, IconData, String)> _destinations = [
-    (Icons.home_outlined, Icons.home, 'Home'),
-    (Icons.music_note_outlined, Icons.music_note, 'Music'),
-    (Icons.radio_outlined, Icons.radio, 'Radio'),
-    (Icons.video_library_outlined, Icons.video_library, 'Video'),
+  /// The m6 icon's name (see M6Icon) and the label of each tab.
+  static const List<(String, String)> _destinations = [
+    ('home', 'Home'),
+    ('music', 'Music'),
+    ('radio', 'Radio'),
+    ('videos', 'Video'),
   ];
 
   @override
@@ -79,8 +81,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   onDestinationSelected: (index) => setState(() => _tab = index),
                   labelType: NavigationRailLabelType.all,
                   destinations: [
-                    for (var (icon, selectedIcon, label) in _destinations)
-                      NavigationRailDestination(icon: Icon(icon), selectedIcon: Icon(selectedIcon), label: Text(label)),
+                    for (var (icon, label) in _destinations)
+                      NavigationRailDestination(icon: M6Icon(icon), label: Text(label)),
                   ],
                 ),
               ),
@@ -99,26 +101,29 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    // The orange block: mini player on top (with its progress track), then the nav in a rounded pill.
+    // The orange block with rounded top corners: mini player on top (with its progress track), then the nav in a white pill.
     return Scaffold(
       body: tabs,
-      bottomNavigationBar: Container(
-        color: brandOrange,
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const MiniPlayer(),
-              Padding(
-                padding: EdgeInsets.fromLTRB(12, 8, 12, 10),
-                child: _NavPill(
-                  selected: _tab,
-                  onSelected: (index) => setState(() => _tab = index),
-                  destinations: _destinations,
+      bottomNavigationBar: ClipRRect(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        child: Container(
+          color: brandOrange,
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const MiniPlayer(),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(12, 8, 12, 10),
+                  child: _NavPill(
+                    selected: _tab,
+                    onSelected: (index) => setState(() => _tab = index),
+                    destinations: _destinations,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -126,55 +131,59 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-/// The floating rounded bar of tab buttons: the open one is solid orange, the rest are plain.
+/// The floating white bar of tab buttons. Each is just its icon until opened;
+/// the open one grows to show its name, on a very transparent black pill.
 class _NavPill extends StatelessWidget {
   final int selected;
   final ValueChanged<int> onSelected;
-  final List<(IconData, IconData, String)> destinations;
+  final List<(String, String)> destinations;
 
   const _NavPill({required this.selected, required this.onSelected, required this.destinations});
 
   @override
   Widget build(BuildContext context) {
-    ColorScheme colors = Theme.of(context).colorScheme;
-    bool dark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: dark ? brandNavyRaised : Color(0xFFFDFDFD),
+      color: Colors.white,
       borderRadius: BorderRadius.circular(28),
       child: Padding(
-        padding: EdgeInsets.all(6),
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             for (int i = 0; i < destinations.length; i++)
-              Expanded(
-                child: Semantics(
-                  button: true,
-                  selected: i == selected,
-                  label: destinations[i].$3,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(22),
-                    onTap: () => onSelected(i),
+              Semantics(
+                button: true,
+                selected: i == selected,
+                label: destinations[i].$2,
+                child: InkWell(
+                  key: ValueKey('nav-${destinations[i].$2}'),
+                  borderRadius: BorderRadius.circular(22),
+                  onTap: () => onSelected(i),
+                  // AnimatedSize is the expanding and shrinking; the name just appears with the room
+                  child: AnimatedSize(
+                    duration: Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.centerLeft,
                     child: AnimatedContainer(
-                      duration: Duration(milliseconds: 180),
-                      padding: EdgeInsets.symmetric(vertical: 8),
+                      duration: Duration(milliseconds: 260),
+                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
-                        color: i == selected ? brandOrange : Colors.transparent,
+                        color: i == selected ? Colors.black.withValues(alpha: 0.07) : Colors.transparent,
                         borderRadius: BorderRadius.circular(22),
                       ),
-                      child: Column(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(i == selected ? destinations[i].$2 : destinations[i].$1,
-                              size: 24, color: i == selected ? Colors.white : colors.onSurfaceVariant),
-                          SizedBox(height: 2),
-                          Text(
-                            destinations[i].$3,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: i == selected ? FontWeight.w600 : FontWeight.normal,
-                              color: i == selected ? Colors.white : colors.onSurfaceVariant,
+                          M6Icon(destinations[i].$1, size: 28),
+                          if (i == selected) ...[
+                            SizedBox(width: 8),
+                            Text(
+                              destinations[i].$2,
+                              maxLines: 1,
+                              softWrap: false,
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),

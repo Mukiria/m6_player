@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <title>m6 player new</title>
+  <defs><linearGradient id="m6-new-dark" x1="6" y1="42" x2="42" y2="6" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#3b82f6"/><stop offset="0.5" stop-color="#60a5fa"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
+  <style>.s{fill:none;stroke:url(#m6-new-dark);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.s .f{fill:url(#m6-new-dark);stroke-width:1.5}</style>
+  <g class="s">
+  <path d="M21,12 Q23,25 36,27 Q23,29 21,42 Q19,29 6,27 Q19,25 21,12 Z"/>
+  <circle cx="37" cy="11" r="5"/><circle cx="37" cy="11" r="1.6" class="f"/>
+  </g>
+</svg>

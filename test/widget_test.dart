@@ -90,7 +90,7 @@ void main() {
     expect(find.byType(NavigationRail), findsNothing);
     expect(find.text('Home'), findsOneWidget); // The floating bottom bar
 
-    await tester.tap(find.text('Radio')); // Switching tabs works from the bottom bar too
+    await tester.tap(find.byKey(ValueKey('nav-Radio'))); // Switching tabs works from the bottom bar too (only the open tab shows its name)
     await tester.pump(Duration(milliseconds: 100));
     expect(find.text('Search stations'), findsOneWidget);
   });

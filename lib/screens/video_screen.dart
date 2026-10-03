@@ -163,6 +163,9 @@ class _VideoScreenState extends State<VideoScreen> {
       from: from,
       header: "$name (${videos.length})",
       onRefresh: from == ItemList.all ? _library.load : null,
+      // The Videos tab: Shorts on top, the rest under their dates (dates only mean something when sorted by date)
+      splitShorts: from == ItemList.all,
+      groupByDate: from == ItemList.all && (_sort == VideoSort.newest || _sort == VideoSort.oldest),
     );
   }
 

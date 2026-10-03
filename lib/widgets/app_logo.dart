@@ -20,7 +20,7 @@ class AppLogo extends StatefulWidget {
   /// Always use the light version (for a white background, whatever the theme).
   final bool forceLight;
 
-  const AppLogo({super.key, this.height = 40, this.alwaysAnimate = false, this.forceLight = false});
+  const AppLogo({super.key, this.height = 44, this.alwaysAnimate = false, this.forceLight = false});
 
   @override
   State<AppLogo> createState() => _AppLogoState();

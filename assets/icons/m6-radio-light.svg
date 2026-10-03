@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <defs><linearGradient id="m6-radio-light" x1="6" y1="42" x2="42" y2="6" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1e3a8a"/><stop offset="0.5" stop-color="#3b82f6"/><stop offset="1" stop-color="#0ea5e9"/></linearGradient></defs>
+  <g fill="none" stroke="url(#m6-radio-light)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="24" cy="24" r="6"/><circle cx="24" cy="24" r="2" fill="url(#m6-radio-light)" stroke-width="1.5"/>
+  <path d="M14.81,16.29 A12,12 0 0 0 14.81,31.71"/><path d="M33.19,31.71 A12,12 0 0 0 33.19,16.29"/>
+  <path d="M8.44,13.10 A19,19 0 0 0 8.44,34.90"/><path d="M39.56,34.90 A19,19 0 0 0 39.56,13.10"/>
+  </g>
+</svg>

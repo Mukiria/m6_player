@@ -226,7 +226,7 @@ class _HomeTabState extends State<HomeTab> {
       cover: ListCover(
         keys: songs.map(songKey).toList(),
         size: size,
-        icon: favourites ? Icons.favorite : Icons.fiber_new,
+        m6Icon: favourites ? 'heart' : 'new',
       ),
       name: favourites ? "Favourites" : "Latest",
       subtitle: count == 0

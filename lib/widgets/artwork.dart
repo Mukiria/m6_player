@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../theme.dart';
+import 'm6_icon.dart';
 
 /// A song's cover art, or a placeholder in the brand colours when it has none:
 /// a music note for songs, a radio for stations.
@@ -12,10 +13,13 @@ class Artwork extends StatelessWidget {
   /// The placeholder's icon when there's no cover (default: a note, or a radio).
   final IconData? icon;
 
+  /// An m6 icon name (see M6Icon) to use in the placeholder instead.
+  final String? m6Icon;
+
   /// Cover image saved from the song's tags, if any.
   final String? coverPath;
 
-  const Artwork({super.key, required this.size, this.isRadio = false, this.round = false, this.coverPath, this.icon});
+  const Artwork({super.key, required this.size, this.isRadio = false, this.round = false, this.coverPath, this.icon, this.m6Icon});
 
   @override
   Widget build(BuildContext context) {
@@ -50,11 +54,13 @@ class Artwork extends StatelessWidget {
           colors: [brandNavyRaised, brandBlueDark, Color(0xFF38BDF8)],
         ),
       ),
-      child: Icon(
-        icon ?? (isRadio ? Icons.radio : Icons.music_note),
-        color: Colors.white,
-        size: size * 0.5,
-      ),
+      child: m6Icon != null
+          ? Center(child: M6Icon(m6Icon!, size: size * 0.55, color: Colors.white))
+          : Icon(
+              icon ?? (isRadio ? Icons.radio : Icons.music_note),
+              color: Colors.white,
+              size: size * 0.5,
+            ),
     );
   }
 }
