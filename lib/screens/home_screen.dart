@@ -103,6 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // The orange block with rounded top corners: mini player on top (with its progress track), then the nav in a white pill.
     return Scaffold(
+      extendBody: true, // The page shows through the nav block's rounded corners
       body: tabs,
       bottomNavigationBar: ClipRRect(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),

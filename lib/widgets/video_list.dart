@@ -145,7 +145,7 @@ class _VideoListState extends State<VideoList> {
             "Videos",
             trailing: IconButton(
               tooltip: grid ? "Show as list" : "Show as grid",
-              icon: Icon(grid ? Icons.view_list : Icons.grid_view, size: 28),
+              icon: Icon(grid ? Icons.view_list : Icons.grid_view, size: 22),
               onPressed: () => AppSettings.instance.setVideoGrid(!grid),
             ),
           ),
@@ -157,7 +157,7 @@ class _VideoListState extends State<VideoList> {
           slivers.add(SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
-              child: Text(formatDate(day), style: TextStyle(fontSize: 18, color: colors.onSurfaceVariant)),
+              child: Text(formatDate(day), style: TextStyle(fontSize: 14, color: colors.onSurfaceVariant)),
             ),
           ));
         }
@@ -180,7 +180,7 @@ class _VideoListState extends State<VideoList> {
                 itemBuilder: (context, index) => _tile(context, group, index, colors),
               ));
       }
-      slivers.add(SliverToBoxAdapter(child: SizedBox(height: 8)));
+      slivers.add(SliverToBoxAdapter(child: SizedBox(height: 8 + MediaQuery.paddingOf(context).bottom))); // Clear of the bottom nav
       return CustomScrollView(slivers: slivers);
     });
     Future<void> Function()? refresh = widget.onRefresh;
@@ -197,8 +197,8 @@ class _VideoListState extends State<VideoList> {
         padding: EdgeInsets.fromLTRB(16, 20, 12, 12),
         child: Row(
           children: [
-            Expanded(child: Text(text, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700))),
-            if (onTap != null) Icon(Icons.chevron_right, size: 32),
+            Expanded(child: Text(text, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+            if (onTap != null) Icon(Icons.chevron_right, size: 24),
             if (trailing != null) trailing,
           ],
         ),
@@ -310,7 +310,7 @@ class _VideoListState extends State<VideoList> {
               ),
               Padding(
                 padding: EdgeInsets.fromLTRB(4, 6, 4, 0),
-                child: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14)),
+                child: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
               ),
             ],
           ),
@@ -344,11 +344,11 @@ class _VideoListState extends State<VideoList> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                  Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                   SizedBox(height: 4),
                   Text(
                     video.height > 0 ? "${video.height < video.width ? video.height : video.width}p" : "",
-                    style: TextStyle(fontSize: 15, color: colors.onSurfaceVariant),
+                    style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant),
                   ),
                 ],
               ),

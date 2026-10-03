@@ -172,7 +172,7 @@ class _VideoScreenState extends State<VideoScreen> {
   Widget _playlistsTab(ColorScheme colors) {
     List<Playlist> playlists = _store?.playlistsOf(MediaKind.video) ?? [];
     return ListView(
-      padding: EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: 8 + MediaQuery.paddingOf(context).bottom), // Clear of the bottom nav
       children: [
         SmartPlaylistTiles(kind: MediaKind.video),
         ListTile(

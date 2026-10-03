@@ -290,7 +290,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
   Widget _playlistsTab(ColorScheme colors) {
     List<Playlist> playlists = _store?.playlistsOf(MediaKind.audio) ?? [];
     return ListView(
-      padding: EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: 8 + MediaQuery.paddingOf(context).bottom), // Clear of the bottom nav
       children: [
         SmartPlaylistTiles(kind: MediaKind.audio),
         ListTile(

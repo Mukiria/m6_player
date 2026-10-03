@@ -40,7 +40,7 @@ class VideoFolders extends StatelessWidget {
           return Center(child: Text("No videos on this phone yet.", style: TextStyle(color: colors.onSurfaceVariant)));
         }
         return ListView.builder(
-          padding: EdgeInsets.only(top: 8, bottom: 8),
+          padding: EdgeInsets.only(top: 8, bottom: 8 + MediaQuery.paddingOf(context).bottom), // Clear of the bottom nav
           itemCount: paths.length,
           itemBuilder: (context, index) {
             String path = paths[index];

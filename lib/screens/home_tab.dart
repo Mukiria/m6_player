@@ -103,7 +103,7 @@ class _HomeTabState extends State<HomeTab> {
     List<RadioStation> stations = _store?.radioRecent.take(12).toList() ?? [];
 
     return TabBackground(
-      image: 'assets/backgrounds/music.jpg',
+      image: 'assets/backgrounds/transfer.jpg',
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
@@ -180,10 +180,25 @@ class _HomeTabState extends State<HomeTab> {
         child: Text(text, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
       );
 
+  /// A card on the page: its usual tint, or white in dark mode (its contents then use the light theme, so the text stays dark).
+  Widget _card({required Color tint, required double radius, required EdgeInsets padding, required Widget child}) {
+    bool dark = Theme.of(context).brightness == Brightness.dark;
+    Widget card = Container(
+      padding: padding,
+      decoration: BoxDecoration(color: dark ? Colors.white : tint, borderRadius: BorderRadius.circular(radius)),
+      // A Material here gives the text the (light) theme's default style, and the rows their ink
+      child: Material(type: MaterialType.transparency, child: child),
+    );
+    return dark ? Theme(data: lightTheme(), child: card) : card;
+  }
+
   Widget _emptyCard(ColorScheme colors) {
-    return Container(
+    bool dark = Theme.of(context).brightness == Brightness.dark;
+    if (dark) colors = lightTheme().colorScheme;
+    return _card(
+      tint: buttonFill(Theme.of(context).brightness),
+      radius: 20,
       padding: EdgeInsets.all(24),
-      decoration: BoxDecoration(color: buttonFill(Theme.of(context).brightness), borderRadius: BorderRadius.circular(20)),
       child: Column(
         children: [
           Icon(Icons.library_music_outlined, size: 48, color: colors.onSurfaceVariant),
@@ -310,9 +325,11 @@ class _HomeTabState extends State<HomeTab> {
 
   Widget _featuredCard(Playlist playlist, ColorScheme colors) {
     List<File> songs = _songsOf(playlist);
-    return Container(
+    if (Theme.of(context).brightness == Brightness.dark) colors = lightTheme().colorScheme;
+    return _card(
+      tint: colors.surfaceContainer,
+      radius: 24,
       padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(color: colors.surfaceContainer, borderRadius: BorderRadius.circular(24)),
       child: Column(
         children: [
           Row(
@@ -375,7 +392,7 @@ class _HomeTabState extends State<HomeTab> {
   }
 }
 
-/// A small rounded button in the app's idle-pill style.
+/// A small rounded orange button with white text.
 class _PillButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -386,7 +403,7 @@ class _PillButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: buttonFill(Theme.of(context).brightness),
+      color: brandOrange,
       shape: StadiumBorder(),
       child: InkWell(
         customBorder: StadiumBorder(),
@@ -395,7 +412,11 @@ class _PillButton extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: [Icon(icon, size: 18), SizedBox(width: 6), Text(label, style: TextStyle(fontWeight: FontWeight.w600))],
+            children: [
+              Icon(icon, size: 18, color: Colors.white),
+              SizedBox(width: 6),
+              Text(label, style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
+            ],
           ),
         ),
       ),
