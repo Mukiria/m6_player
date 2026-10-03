@@ -58,49 +58,62 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               bottom: false,
               child: Column(
                 children: [
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: _finish,
-                      style: TextButton.styleFrom(foregroundColor: brandBlueDark),
-                      child: Text(last ? "" : "Skip"),
-                    ),
-                  ),
-                  // The animated logo (light version, as it sits on white) stays above every page
-                  AppLogo(height: 56, alwaysAnimate: true, forceLight: true),
-                  // Jacinta sits right on the card's edge, with the page dots over the bottom of her photo
-                  Expanded(
+                  // The animated logo (light version, as it sits on white) stays above every page,
+                  // centred on the same line as the Skip button
+                  SizedBox(
+                    height: 56,
                     child: Stack(
-                      alignment: Alignment.bottomCenter,
+                      alignment: Alignment.center,
                       children: [
-                        Positioned.fill(
-                          child: Image.asset(
-                            'assets/brand_ambassador/jacinta-m6-player.jpg',
-                            fit: BoxFit.contain,
-                            alignment: Alignment.bottomCenter,
-                            semanticLabel: "Jacinta, the M6 brand ambassador, dancing with headphones",
-                          ),
-                        ),
-                        Padding(
-                          padding: EdgeInsets.only(bottom: 14),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              for (int i = 0; i < _pages.length; i++)
-                                AnimatedContainer(
-                                  duration: Duration(milliseconds: 200),
-                                  margin: EdgeInsets.symmetric(horizontal: 3),
-                                  width: i == _page ? 20 : 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: i == _page ? brandOrange : brandOrange.withValues(alpha: 0.4),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                ),
-                            ],
+                        AppLogo(height: 56, alwaysAnimate: true, forceLight: true),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: _finish,
+                            style: TextButton.styleFrom(foregroundColor: brandBlueDark),
+                            child: Text(last ? "" : "Skip"),
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                  // Jacinta sits right on the card's edge, with the page dots over the bottom of her photo
+                  Expanded(
+                    // Full width, or the Stack shrinks to the page dots and so does Jacinta
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: Stack(
+                        alignment: Alignment.bottomCenter,
+                        children: [
+                          Positioned.fill(
+                            child: Image.asset(
+                              'assets/brand_ambassador/jacinta-m6-player.jpg',
+                              fit: BoxFit.contain,
+                              alignment: Alignment.bottomCenter,
+                              semanticLabel: "Jacinta, the M6 brand ambassador, dancing with headphones",
+                            ),
+                          ),
+                          Padding(
+                            padding: EdgeInsets.only(bottom: 14),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                for (int i = 0; i < _pages.length; i++)
+                                  AnimatedContainer(
+                                    duration: Duration(milliseconds: 200),
+                                    margin: EdgeInsets.symmetric(horizontal: 3),
+                                    width: i == _page ? 20 : 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: i == _page ? brandOrange : brandOrange.withValues(alpha: 0.4),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],

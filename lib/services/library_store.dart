@@ -35,17 +35,20 @@ class Playlist {
   String name;
   final MediaKind kind;
   final List<String> songs; // Item keys: songKey() for songs, videoKey() for videos
+  String? coverPath; // A picture the user chose for the playlist, if any
 
-  Playlist({required this.id, required this.name, this.kind = MediaKind.audio, List<String>? songs})
+  Playlist({required this.id, required this.name, this.kind = MediaKind.audio, List<String>? songs, this.coverPath})
       : songs = songs ?? [];
 
-  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'kind': kind.name, 'songs': songs};
+  Map<String, dynamic> toJson() =>
+      {'id': id, 'name': name, 'kind': kind.name, 'songs': songs, if (coverPath != null) 'coverPath': coverPath};
 
   factory Playlist.fromJson(Map<String, dynamic> json) => Playlist(
         id: json['id'] as String,
         name: json['name'] as String,
         kind: MediaKind.values.asNameMap()[json['kind']] ?? MediaKind.audio,
         songs: (json['songs'] as List).cast<String>(),
+        coverPath: json['coverPath'] as String?,
       );
 }
 
@@ -360,7 +363,27 @@ class LibraryStore extends ChangeNotifier {
     await _changed();
   }
 
+  /// Sets the playlist's own cover picture (null goes back to the songs' covers).
+  Future<void> setPlaylistCover(String id, String? path) async {
+    Playlist? list = playlist(id);
+    if (list == null) return;
+    String? old = list.coverPath;
+    list.coverPath = path;
+    if (old != null && old != path) {
+      try {
+        await File(old).delete();
+      } catch (_) {} // Already gone
+    }
+    await _changed();
+  }
+
   Future<void> deletePlaylist(String id) async {
+    String? cover = playlist(id)?.coverPath;
+    if (cover != null) {
+      try {
+        await File(cover).delete();
+      } catch (_) {}
+    }
     _playlists.removeWhere((p) => p.id == id);
     await _changed();
   }

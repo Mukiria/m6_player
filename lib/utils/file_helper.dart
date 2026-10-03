@@ -86,3 +86,22 @@ Future<File> importToLibrary(File source, Directory dir) async {
 Future<void> removeFromLibrary(File file) async {
   if (await file.exists()) await file.delete();
 }
+
+/// Lets the user choose a picture (for a playlist cover). Null if cancelled.
+Future<File?> pickImage() async {
+  List<PlatformFile> picked = await FilePicker.pickFiles(type: FileType.image);
+  String? path = picked.isEmpty ? null : picked.first.path;
+  return path == null ? null : File(path);
+}
+
+/// Copies a chosen picture into the app's own folder, so it survives the original being moved or deleted.
+Future<String> saveCoverImage(File source) async {
+  Directory docs = await getApplicationDocumentsDirectory();
+  Directory dir = await Directory('${docs.path}/playlist_covers').create(recursive: true);
+  String name = source.uri.pathSegments.last;
+  int dot = name.lastIndexOf('.');
+  String ext = dot > 0 ? name.substring(dot) : '.jpg';
+  File target = File('${dir.path}/${DateTime.now().microsecondsSinceEpoch}$ext'); // New name each time, so the new picture shows at once
+  await source.copy(target.path);
+  return target.path;
+}

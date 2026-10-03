@@ -58,64 +58,92 @@ class _MiniPlayerState extends State<MiniPlayer> {
     MediaItem? item = _item;
     if (item == null) return SizedBox.shrink();
 
-    ColorScheme colors = Theme.of(context).colorScheme;
     bool isRadio = isRadioItem(item);
-    // Radio streams have no length, so the ring just shows "playing" in full.
-    double progress = _duration.inMilliseconds > 0
-        ? (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0)
-        : (_isPlaying ? 1.0 : 0.0);
+    bool hasLength = _duration.inMilliseconds > 0;
+    double progress = hasLength ? (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0) : 0.0;
 
+    // Sits on the orange bottom block (see HomeScreen), so it's white on transparent.
     return Material(
-      color: colors.surfaceContainerHigh,
+      color: Colors.transparent,
       child: InkWell(
         onTap: _openNowPlaying,
         child: Padding(
-          padding: EdgeInsets.fromLTRB(12, 8, 8, 8),
-          child: Row(
+          padding: EdgeInsets.fromLTRB(16, 10, 8, 0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Artwork(size: 44, isRadio: isRadio, round: true, coverPath: item.artUri?.toFilePath()),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
-                    Text(itemSubtitle(item), maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant)),
-                  ],
-                ),
-              ),
-              SizedBox(
-                width: 44,
-                height: 44,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    CircularProgressIndicator(
-                      value: progress,
-                      strokeWidth: 2,
-                      color: colors.primary,
-                      backgroundColor: colors.outlineVariant,
+              Row(
+                children: [
+                  Artwork(size: 44, isRadio: isRadio, coverPath: item.artUri?.toFilePath()),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
+                        Text(itemSubtitle(item), maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.85))),
+                      ],
                     ),
+                  ),
+                  IconButton(
+                    tooltip: _isPlaying ? 'Pause' : 'Play',
+                    color: Colors.white,
+                    icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
+                    onPressed: () => _isPlaying ? _audioPlayer.pause() : _service.resume(),
+                  ),
+                  if (!isRadio)
                     IconButton(
-                      tooltip: _isPlaying ? 'Pause' : 'Play',
-                      icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
-                      onPressed: () => _isPlaying ? _audioPlayer.pause() : _service.resume(),
+                      tooltip: 'Next',
+                      color: Colors.white,
+                      icon: Icon(Icons.skip_next),
+                      onPressed: _service.next,
                     ),
-                  ],
-                ),
+                ],
               ),
-              if (!isRadio)
-                IconButton(
-                  tooltip: 'Next',
-                  icon: Icon(Icons.skip_next),
-                  onPressed: _service.next,
-                ),
+              // Progress track (songs and videos have a length; a radio stream doesn't)
+              Padding(
+                padding: EdgeInsets.only(right: 8, top: 4, bottom: 2),
+                child: _ProgressTrack(progress: hasLength ? progress : (_isPlaying ? 1.0 : 0.0), showThumb: hasLength),
+              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// A thin line showing how far through the song it is, white on a see-through white track, with a dot at the end.
+class _ProgressTrack extends StatelessWidget {
+  final double progress;
+  final bool showThumb;
+
+  const _ProgressTrack({required this.progress, required this.showThumb});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 10,
+      child: LayoutBuilder(
+        builder: (context, box) {
+          double x = box.maxWidth * progress;
+          return Stack(
+            alignment: Alignment.centerLeft,
+            clipBehavior: Clip.none,
+            children: [
+              Container(height: 3, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.35), borderRadius: BorderRadius.circular(2))),
+              Container(width: x, height: 3, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(2))),
+              if (showThumb)
+                Positioned(
+                  left: (x - 5).clamp(0.0, box.maxWidth - 10),
+                  child: Container(width: 10, height: 10, decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
+                ),
+            ],
+          );
+        },
       ),
     );
   }

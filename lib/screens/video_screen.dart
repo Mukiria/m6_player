@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/pill_tab_bar.dart';
 import 'package:photo_manager/photo_manager.dart';
 import '../services/library_store.dart';
 import '../services/video_library.dart';
@@ -127,14 +128,7 @@ class _VideoScreenState extends State<VideoScreen> {
             const SearchButton(),
             const AppMenuButton(),
           ],
-          bottom: TabBar(
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            dividerColor: Colors.transparent,
-            labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            unselectedLabelStyle: TextStyle(fontSize: 16),
-            tabs: [Tab(text: "Videos"), Tab(text: "Folders"), Tab(text: "Favourites"), Tab(text: "Latest"), Tab(text: "Playlists")],
-          ),
+          bottom: PillTabBar(labels: ["Videos", "Folders", "Favourites", "Latest", "Playlists"]),
         ),
         body: _library.isLoading && _library.videos.isEmpty
             ? Center(child: CircularProgressIndicator())

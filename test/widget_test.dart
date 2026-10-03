@@ -33,20 +33,32 @@ void main() {
 
   Widget app({ThemeData? theme}) => MaterialApp(theme: theme ?? lightTheme(), home: const HomeScreen());
 
-  testWidgets('home has Music, Radio and Video tabs, and no mini player before anything plays',
+  testWidgets('home has Home, Music, Radio and Video tabs, opens on My Listen, and no mini player before anything plays',
       (tester) async {
     await tester.pumpWidget(app());
     await tester.pump(Duration(milliseconds: 100));
 
+    expect(find.text('Home'), findsOneWidget);
     expect(find.text('Music'), findsOneWidget);
     expect(find.text('Radio'), findsOneWidget);
     expect(find.text('Video'), findsOneWidget);
+    expect(find.text('My Listen'), findsOneWidget);
+    expect(find.text('Favourites'), findsOneWidget); // Starter tiles are there from the start
+    expect(find.text('Latest'), findsOneWidget);
+    expect(find.text('Start your library'), findsOneWidget);
+    expect(find.text('Add songs'), findsOneWidget);
+    expect(find.text('Browse radio'), findsOneWidget);
+
+    await tester.tap(find.text('Music'));
+    await tester.pump(Duration(milliseconds: 100));
     expect(find.text('No songs yet'), findsOneWidget);
     expect(find.byIcon(Icons.skip_next), findsNothing); // The mini player is hidden
   });
 
   testWidgets('the music tab has Songs, Favourites and Playlists, and a sort menu', (tester) async {
     await tester.pumpWidget(app());
+    await tester.pump(Duration(milliseconds: 100));
+    await tester.tap(find.text('Music'));
     await tester.pump(Duration(milliseconds: 100));
 
     expect(find.text('Songs'), findsOneWidget);
@@ -69,7 +81,6 @@ void main() {
     await tester.pumpWidget(app()); // The test window is 800 wide
     await tester.pump(Duration(milliseconds: 100));
     expect(find.byType(NavigationRail), findsOneWidget);
-    expect(find.byType(NavigationBar), findsNothing);
 
     tester.view.physicalSize = Size(400, 800);
     tester.view.devicePixelRatio = 1.0;
@@ -77,7 +88,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pump(Duration(milliseconds: 100));
     expect(find.byType(NavigationRail), findsNothing);
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.text('Home'), findsOneWidget); // The floating bottom bar
 
     await tester.tap(find.text('Radio')); // Switching tabs works from the bottom bar too
     await tester.pump(Duration(milliseconds: 100));
@@ -120,6 +131,8 @@ void main() {
 
   testWidgets('the add button offers songs or a folder', (tester) async {
     await tester.pumpWidget(app());
+    await tester.pump(Duration(milliseconds: 100));
+    await tester.tap(find.text('Music'));
     await tester.pump(Duration(milliseconds: 100));
 
     await tester.tap(find.byTooltip('Add songs'));

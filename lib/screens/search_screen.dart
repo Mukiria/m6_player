@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import '../widgets/pill_tab_bar.dart';
 import 'package:photo_manager/photo_manager.dart';
 import '../services/library_store.dart';
 import '../services/music_library.dart';
@@ -99,13 +100,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 },
               ),
           ],
-          bottom: TabBar(
-            tabs: [
-              Tab(text: "Songs (${songs.length})"),
-              Tab(text: "Videos (${videos.length})"),
-              Tab(text: "Playlists (${playlists.length})"),
-            ],
-          ),
+          bottom: PillTabBar(labels: ["Songs (${songs.length})", "Videos (${videos.length})", "Playlists (${playlists.length})"]),
         ),
         body: _query.isEmpty
             ? Center(child: Text("Type to search", style: TextStyle(color: colors.onSurfaceVariant)))

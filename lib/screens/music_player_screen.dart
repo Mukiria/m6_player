@@ -7,9 +7,10 @@ import '../services/track_info.dart';
 import '../utils/file_helper.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/app_menu.dart';
-import '../widgets/artwork.dart';
 import '../widgets/item_actions.dart';
 import '../widgets/music_browse.dart';
+import '../widgets/pill_tab_bar.dart';
+import '../widgets/playlist_cover.dart';
 import '../widgets/playlist_picker.dart';
 import '../widgets/song_list.dart';
 import '../widgets/tab_background.dart';
@@ -20,6 +21,9 @@ import 'smart_playlist_screen.dart';
 /// adding music. Hidden songs are left out of every list, filtered-out ones out
 /// of Songs. The playback controls live in the mini player and Now Playing.
 class MusicPlayerScreen extends StatefulWidget {
+  /// Bumped (by Home's "Add songs" button) to open this tab's add-songs menu.
+  static final ValueNotifier<int> addSongsRequests = ValueNotifier(0);
+
   const MusicPlayerScreen({super.key});
 
   @override
@@ -35,6 +39,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
   @override
   void initState() {
     super.initState();
+    MusicPlayerScreen.addSongsRequests.addListener(_onAddSongsRequested);
     _library.addListener(_onChanged);
     _library.load();
     LibraryStore.instance().then((store) {
@@ -46,8 +51,13 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
 
   void _onChanged() => setState(() {});
 
+  void _onAddSongsRequested() {
+    if (mounted && !_isImporting) _showAddOptions();
+  }
+
   @override
   void dispose() {
+    MusicPlayerScreen.addSongsRequests.removeListener(_onAddSongsRequested);
     _library.removeListener(_onChanged);
     _store?.removeListener(_onChanged);
     super.dispose();
@@ -196,17 +206,10 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
               const AppMenuButton(),
             ],
             bottom: PreferredSize(
-              preferredSize: Size.fromHeight(50),
+              preferredSize: Size.fromHeight(54),
               child: Column(
                 children: [
-                  TabBar(
-                    isScrollable: true,
-                    tabAlignment: TabAlignment.start,
-                    dividerColor: Colors.transparent,
-                    labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                    unselectedLabelStyle: TextStyle(fontSize: 16),
-                    tabs: [Tab(text: "Songs"), Tab(text: "Browse"), Tab(text: "Favourites"), Tab(text: "Latest"), Tab(text: "Playlists")],
-                  ),
+                  PillTabBar(labels: ["Songs", "Browse", "Favourites", "Latest", "Playlists"]),
                   SizedBox(height: 2, child: _isImporting ? LinearProgressIndicator(minHeight: 2) : null),
                 ],
               ),
@@ -309,16 +312,9 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
   }
 
   Widget _playlistTile(Playlist playlist, ColorScheme colors) {
-    // The first song that has a cover stands in for the playlist's picture.
-    String? cover = playlist.songs
-        .map(_library.songNamed)
-        .whereType<File>()
-        .map((song) => TrackInfoService.instance.infoFor(song).coverPath)
-        .whereType<String>()
-        .firstOrNull;
     int count = playlist.songs.length;
     return ListTile(
-      leading: Artwork(size: 48, coverPath: cover),
+      leading: PlaylistCover(playlist: playlist, size: 48),
       title: Text(playlist.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text("$count ${count == 1 ? "song" : "songs"}", style: TextStyle(color: colors.onSurfaceVariant)),
       trailing: Icon(Icons.chevron_right),

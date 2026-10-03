@@ -9,10 +9,13 @@ class Artwork extends StatelessWidget {
   final bool isRadio;
   final bool round;
 
+  /// The placeholder's icon when there's no cover (default: a note, or a radio).
+  final IconData? icon;
+
   /// Cover image saved from the song's tags, if any.
   final String? coverPath;
 
-  const Artwork({super.key, required this.size, this.isRadio = false, this.round = false, this.coverPath});
+  const Artwork({super.key, required this.size, this.isRadio = false, this.round = false, this.coverPath, this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +51,7 @@ class Artwork extends StatelessWidget {
         ),
       ),
       child: Icon(
-        isRadio ? Icons.radio : Icons.music_note,
+        icon ?? (isRadio ? Icons.radio : Icons.music_note),
         color: Colors.white,
         size: size * 0.5,
       ),

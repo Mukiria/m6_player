@@ -6,6 +6,7 @@ import '../services/music_library.dart';
 import '../services/player_service.dart';
 import '../services/video_library.dart';
 import '../widgets/item_actions.dart';
+import '../widgets/playlist_cover.dart';
 import '../widgets/playlist_picker.dart';
 import '../widgets/song_list.dart';
 import '../widgets/video_list.dart';
@@ -93,9 +94,16 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         actions: [
           PopupMenuButton<String>(
             tooltip: "More",
-            onSelected: (action) => action == "rename" ? _rename(playlist) : _delete(playlist),
+            onSelected: (action) => switch (action) {
+              "rename" => _rename(playlist),
+              "cover" => chooseCoverPhoto(context, playlist),
+              "removeCover" => removeCoverPhoto(playlist),
+              _ => _delete(playlist),
+            },
             itemBuilder: (context) => [
               PopupMenuItem(value: "rename", child: Text("Rename")),
+              PopupMenuItem(value: "cover", child: Text(playlist.coverPath == null ? "Add cover photo" : "Change cover photo")),
+              if (playlist.coverPath != null) PopupMenuItem(value: "removeCover", child: Text("Remove cover photo")),
               PopupMenuItem(value: "delete", child: Text("Delete playlist")),
             ],
           ),

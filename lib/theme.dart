@@ -6,7 +6,12 @@ const Color brandBlueDark = Color(0xFF2563EB); // Accent on light backgrounds (b
 const Color brandBlueLight = Color(0xFF60A5FA); // Accent on dark backgrounds
 const Color brandNavy = Color(0xFF0B1533);
 const Color brandNavyRaised = Color(0xFF131F45); // Bars and sheets in dark mode
-const Color brandOrange = Color(0xFFF1552C); // The bottom navigation bar
+const Color brandOrange = Color(0xFFF1552C); // The bottom navigation block and the active buttons
+
+/// The fill of an idle button or tab pill: a very transparent white on dark
+/// backgrounds, a very transparent black on light ones. Active ones are solid [brandOrange].
+Color buttonFill(Brightness brightness) =>
+    brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.10) : Colors.black.withValues(alpha: 0.06);
 
 /// Clean light theme: white background, black text, blue only for what is selected or playing.
 ThemeData lightTheme() {
@@ -37,6 +42,14 @@ ThemeData _base(ColorScheme scheme) {
       backgroundColor: scheme.surface,
       surfaceTintColor: Colors.transparent,
       scrolledUnderElevation: 0,
+    ),
+    chipTheme: ChipThemeData(
+      shape: StadiumBorder(),
+      side: BorderSide.none,
+      showCheckmark: false,
+      color: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected) ? brandOrange : buttonFill(scheme.brightness)),
+      labelStyle: TextStyle(color: scheme.onSurface),
     ),
     // Orange bar with white icons in both themes; the selected tab gets a soft white pill.
     navigationBarTheme: NavigationBarThemeData(
