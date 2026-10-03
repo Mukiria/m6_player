@@ -27,8 +27,9 @@ class ListCover extends StatelessWidget {
   final List<String> keys; // Song keys (see songKey)
   final double size;
   final String? m6Icon; // An M6Icon name for the placeholder
+  final bool whitePlaceholder;
 
-  const ListCover({super.key, required this.keys, required this.size, this.m6Icon});
+  const ListCover({super.key, required this.keys, required this.size, this.m6Icon, this.whitePlaceholder = false});
 
   List<String> get _covers => keys
       .map(MusicLibrary.instance.songNamed)
@@ -42,7 +43,7 @@ class ListCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     List<String> covers = _covers;
-    if (covers.length < 4) return Artwork(size: size, coverPath: covers.firstOrNull, m6Icon: m6Icon);
+    if (covers.length < 4) return Artwork(size: size, coverPath: covers.firstOrNull, m6Icon: m6Icon, whitePlaceholder: whitePlaceholder);
     double half = size / 2;
     return ClipRRect(
       borderRadius: BorderRadius.circular(size * 0.08),

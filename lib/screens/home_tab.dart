@@ -193,12 +193,14 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _emptyCard(ColorScheme colors) {
+    // Very transparent in both modes: black on light, white on dark (the same strength)
     bool dark = Theme.of(context).brightness == Brightness.dark;
-    if (dark) colors = lightTheme().colorScheme;
-    return _card(
-      tint: buttonFill(Theme.of(context).brightness),
-      radius: 20,
+    return Container(
       padding: EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: (dark ? Colors.white : Colors.black).withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Column(
         children: [
           Icon(Icons.library_music_outlined, size: 48, color: colors.onSurfaceVariant),
@@ -236,17 +238,35 @@ class _HomeTabState extends State<HomeTab> {
     bool favourites = list == QuickList.favourites;
     List<File> songs = QuickListScreen.songsOf(list, _store);
     int count = songs.length;
+    bool dark = Theme.of(context).brightness == Brightness.dark;
     return _tile(
       size: size,
       cover: ListCover(
         keys: songs.map(songKey).toList(),
         size: size,
         m6Icon: favourites ? 'heart' : 'new',
+        whitePlaceholder: dark, // White in dark mode, the brand gradient in light mode
       ),
       name: favourites ? "Favourites" : "Latest",
       subtitle: count == 0
-          ? (favourites ? "Tap ♥ on a song" : "Songs you add here")
+          ? (favourites ? "" : "Songs you add here")
           : "$count ${count == 1 ? "song" : "songs"}",
+      // "Tap [heart outline] on a song": white outline in dark mode, black in light, no fill
+      subtitleWidget: count == 0 && favourites
+          ? Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: "Tap "),
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Icon(Icons.favorite_border, size: 16, color: dark ? Colors.white : Colors.black),
+                  ),
+                  TextSpan(text: " on a song"),
+                ],
+              ),
+              style: TextStyle(color: colors.onSurfaceVariant),
+            )
+          : null,
       colors: colors,
       onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => QuickListScreen(list: list))),
     );
@@ -258,6 +278,7 @@ class _HomeTabState extends State<HomeTab> {
     required Widget cover,
     required String name,
     required String subtitle,
+    Widget? subtitleWidget,
     required ColorScheme colors,
     required VoidCallback onTap,
     Widget? menu,
@@ -273,7 +294,7 @@ class _HomeTabState extends State<HomeTab> {
             Stack(children: [cover, if (menu != null) Positioned(top: 4, right: 4, child: menu)]),
             SizedBox(height: 8),
             Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            Text(subtitle, style: TextStyle(color: colors.onSurfaceVariant)),
+            subtitleWidget ?? Text(subtitle, style: TextStyle(color: colors.onSurfaceVariant)),
           ],
         ),
       ),

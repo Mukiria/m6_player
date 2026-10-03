@@ -16,10 +16,13 @@ class Artwork extends StatelessWidget {
   /// An m6 icon name (see M6Icon) to use in the placeholder instead.
   final String? m6Icon;
 
+  /// A white placeholder with the m6 icon in its brand gradient (needs [m6Icon]), instead of the gradient one.
+  final bool whitePlaceholder;
+
   /// Cover image saved from the song's tags, if any.
   final String? coverPath;
 
-  const Artwork({super.key, required this.size, this.isRadio = false, this.round = false, this.coverPath, this.icon, this.m6Icon});
+  const Artwork({super.key, required this.size, this.isRadio = false, this.round = false, this.coverPath, this.icon, this.m6Icon, this.whitePlaceholder = false});
 
   @override
   Widget build(BuildContext context) {
@@ -48,14 +51,17 @@ class Artwork extends StatelessWidget {
       decoration: BoxDecoration(
         shape: round ? BoxShape.circle : BoxShape.rectangle,
         borderRadius: radius,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [brandNavyRaised, brandBlueDark, Color(0xFF38BDF8)],
-        ),
+        color: whitePlaceholder && m6Icon != null ? Colors.white : null,
+        gradient: whitePlaceholder && m6Icon != null
+            ? null
+            : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [brandNavyRaised, brandBlueDark, Color(0xFF38BDF8)],
+              ),
       ),
       child: m6Icon != null
-          ? Center(child: M6Icon(m6Icon!, size: size * 0.55, color: Colors.white))
+          ? Center(child: M6Icon(m6Icon!, size: size * 0.55, color: whitePlaceholder ? null : Colors.white))
           : Icon(
               icon ?? (isRadio ? Icons.radio : Icons.music_note),
               color: Colors.white,
