@@ -77,7 +77,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ],
                     ),
                   ),
-                  // Jacinta sits right on the card's edge, with the page dots over the bottom of her photo
+                  // Jacinta fills the height between the logo and the card, centred, with the page dots over the bottom of her photo
                   Expanded(
                     // Full width, or the Stack shrinks to the page dots and so does Jacinta
                     child: SizedBox(
@@ -88,8 +88,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           Positioned.fill(
                             child: Image.asset(
                               'assets/brand_ambassador/jacinta-m6-player.jpg',
-                              fit: BoxFit.contain,
-                              alignment: Alignment.bottomCenter,
+                              fit: BoxFit.contain, // The photo is tall: it takes the full height, centred
+                              alignment: Alignment.center,
                               semanticLabel: "Jacinta, the M6 brand ambassador, dancing with headphones",
                             ),
                           ),
@@ -105,7 +105,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                     width: i == _page ? 20 : 8,
                                     height: 8,
                                     decoration: BoxDecoration(
-                                      color: i == _page ? brandOrange : brandOrange.withValues(alpha: 0.4),
+                                      color: i == _page ? brandBlueDark : brandBlueDark.withValues(alpha: 0.35),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                   ),
@@ -122,7 +122,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           Container(
             decoration: BoxDecoration(
-              color: brandBlueDark,
+              color: brandOrange,
               borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
             ),
             child: SafeArea(
@@ -139,26 +139,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // All steps share one spot, so the card is as tall as the longest and doesn't jump
-                      Stack(
-                        alignment: Alignment.topCenter,
-                        children: [
-                          for (int i = 0; i < _pages.length; i++)
-                            AnimatedOpacity(
-                              duration: Duration(milliseconds: 200),
-                              opacity: i == _page ? 1 : 0,
-                              child: ExcludeSemantics(
-                                excluding: i != _page,
-                                child: _step(_pages[i].$1, _pages[i].$2),
+                      // All steps share one spot, so the card is as tall as the longest and doesn't jump.
+                      // They sit side by side, one screen width apart, and slide: Next moves them right
+                      // to left, going back moves them left to right.
+                      ClipRect(
+                        child: Stack(
+                          alignment: Alignment.topCenter,
+                          children: [
+                            for (int i = 0; i < _pages.length; i++)
+                              AnimatedSlide(
+                                duration: Duration(milliseconds: 300),
+                                curve: Curves.easeOutCubic,
+                                offset: Offset((i - _page).toDouble(), 0),
+                                child: ExcludeSemantics(
+                                  excluding: i != _page,
+                                  child: SizedBox(width: double.infinity, child: _step(_pages[i].$1, _pages[i].$2)),
+                                ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                       SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(
-                          style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: brandBlueDark),
+                          style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: brandOrange),
                           onPressed: last ? _finish : () => setState(() => _page++),
                           child: Text(last ? "Get started" : "Next"),
                         ),
