@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/app_settings.dart';
+import '../theme.dart';
 import '../widgets/app_logo.dart';
 
 /// A few swipeable pages shown once, the first time the app opens: what it
@@ -39,80 +40,115 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ColorScheme colors = Theme.of(context).colorScheme;
     bool last = _page == _pages.length - 1;
+    // White top with Jacinta, brand-blue panel below with the steps (same in light and dark mode)
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(onPressed: _finish, child: Text(last ? "" : "Skip")),
-            ),
-            // The animated logo stays above every page
-            AppLogo(height: 56, alwaysAnimate: true),
-            Expanded(
-              child: PageView.builder(
-                controller: _controller,
-                itemCount: _pages.length,
-                onPageChanged: (page) => setState(() => _page = page),
-                itemBuilder: (context, index) {
-                  var (icon, title, text) = _pages[index];
-                  return Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 32),
-                    child: SingleChildScrollView(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(minHeight: 360),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(icon, size: 72, color: colors.primary),
-                            SizedBox(height: 24),
-                            Text(title,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
-                            SizedBox(height: 12),
-                            Text(text,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 16, height: 1.4, color: colors.onSurfaceVariant)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                for (int i = 0; i < _pages.length; i++)
-                  AnimatedContainer(
-                    duration: Duration(milliseconds: 200),
-                    margin: EdgeInsets.all(4),
-                    width: i == _page ? 20 : 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: i == _page ? colors.primary : colors.outlineVariant,
-                      borderRadius: BorderRadius.circular(4),
+      backgroundColor: Colors.white,
+      body: Column(
+        children: [
+          Expanded(
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _finish,
+                      style: TextButton.styleFrom(foregroundColor: brandBlueDark),
+                      child: Text(last ? "" : "Skip"),
                     ),
                   ),
-              ],
-            ),
-            Padding(
-              padding: EdgeInsets.all(24),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: last
-                      ? _finish
-                      : () => _controller.nextPage(duration: Duration(milliseconds: 250), curve: Curves.easeOut),
-                  child: Text(last ? "Get started" : "Next"),
-                ),
+                  // The animated logo (light version, as it sits on white) stays above every page
+                  AppLogo(height: 56, alwaysAnimate: true, forceLight: true),
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Image.asset(
+                        'assets/brand_ambassador/jacinta-m6-player.jpg',
+                        fit: BoxFit.contain,
+                        alignment: Alignment.bottomCenter,
+                        semanticLabel: "Jacinta, the M6 brand ambassador, dancing with headphones",
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: brandBlueDark,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 250,
+                    child: PageView.builder(
+                      controller: _controller,
+                      itemCount: _pages.length,
+                      onPageChanged: (page) => setState(() => _page = page),
+                      itemBuilder: (context, index) {
+                        var (icon, title, text) = _pages[index];
+                        return Padding(
+                          padding: EdgeInsets.fromLTRB(32, 24, 32, 0),
+                          child: SingleChildScrollView(
+                            child: Column(
+                              children: [
+                                Icon(icon, size: 36, color: brandOrange),
+                                SizedBox(height: 12),
+                                Text(title,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: Colors.white)),
+                                SizedBox(height: 8),
+                                Text(text,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(fontSize: 15, height: 1.4, color: Colors.white.withValues(alpha: 0.9))),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      for (int i = 0; i < _pages.length; i++)
+                        AnimatedContainer(
+                          duration: Duration(milliseconds: 200),
+                          margin: EdgeInsets.all(4),
+                          width: i == _page ? 20 : 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: i == _page ? Colors.white : Colors.white38,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                    ],
+                  ),
+                  Padding(
+                    padding: EdgeInsets.all(24),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: brandBlueDark),
+                        onPressed: last
+                            ? _finish
+                            : () => _controller.nextPage(duration: Duration(milliseconds: 250), curve: Curves.easeOut),
+                        child: Text(last ? "Get started" : "Next"),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

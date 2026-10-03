@@ -17,7 +17,10 @@ class AppLogo extends StatefulWidget {
   /// Animate whether or not anything is playing (the first-run intro pages).
   final bool alwaysAnimate;
 
-  const AppLogo({super.key, this.height = 40, this.alwaysAnimate = false});
+  /// Always use the light version (for a white background, whatever the theme).
+  final bool forceLight;
+
+  const AppLogo({super.key, this.height = 40, this.alwaysAnimate = false, this.forceLight = false});
 
   @override
   State<AppLogo> createState() => _AppLogoState();
@@ -66,7 +69,7 @@ class _AppLogoState extends State<AppLogo> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    bool dark = Theme.of(context).brightness == Brightness.dark;
+    bool dark = !widget.forceLight && Theme.of(context).brightness == Brightness.dark;
     bool animate = _isPlaying && !MediaQuery.disableAnimationsOf(context); // Respects "remove animations"
     if (!animate) {
       return SvgPicture.asset(

@@ -18,6 +18,7 @@
 | Name | "M6 Player" (Android `android:label`, iOS `CFBundleDisplayName`) |
 | Theme | Brand blue from the logo: accent `#3B82F6` (`#2563EB` on light, `#60A5FA` on dark), navy `#0B1533` for dark mode; the bottom nav bar is brand orange `#F1552C` with white icons. Light / dark mode follows the phone unless chosen under ⋮ |
 | Logos | Source SVGs in `branding/` (from `M6ix/m6 player/`); `node branding/make-icons.js` regenerates `assets/branding/logo-{light,dark}.svg`, all app icons and the notification's m6 button; `node branding/make-logo-animation.js` regenerates the animated logo's data |
+| Brand ambassador | Jacinta (AI-generated, see `company/about.md`). `assets/brand_ambassador/jacinta-m6-player.jpg` is a compressed copy of `brand ambassador/jacinta m6 player.png`; used on the first-run onboarding (white top with her and the always-light animated logo, brand-blue `#2563EB` rounded-top panel with the steps, orange icons) |
 | Backgrounds | `assets/backgrounds/`: `music.jpg` (Music tab), `radio.jpg` (Radio tab), `transfer.jpg` (file transfer page) |
 | Legal | Privacy policy https://msixv.com/games/privacy-policy · Terms (EULA) https://msixv.com/games/terms-of-service |
 | Repo | https://github.com/Mukiria/m6_player (branch `master`) |
