@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../screens/equalizer_screen.dart';
 import '../screens/hidden_screen.dart';
+import '../screens/privacy_screen.dart';
 import '../screens/search_screen.dart';
 import '../screens/transfer_screen.dart';
 import '../services/app_settings.dart';
@@ -10,8 +11,7 @@ import 'backup_sheet.dart';
 import 'options_sheet.dart';
 import 'pin_dialog.dart';
 
-/// Where the legal pages live (on msixv.com, M6V's site).
-const String privacyPolicyUrl = 'https://msixv.com/games/privacy-policy';
+/// Where the terms live (on msixv.com, M6V's site). The privacy policy URL is in privacy_screen.dart.
 const String termsUrl = 'https://msixv.com/games/terms-of-service';
 
 /// The magnifying glass in the top bar: opens the search page.
@@ -72,7 +72,7 @@ class AppMenuButton extends StatelessWidget {
       case "receive":
         _push(context, const TransferScreen());
       case "privacy":
-        _openLink(context, privacyPolicyUrl);
+        _push(context, const PrivacyScreen());
       case "terms":
         _openLink(context, termsUrl);
     }

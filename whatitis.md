@@ -20,7 +20,7 @@
 | Logos | Source SVGs in `branding/` (from `M6ix/m6 player/`); `node branding/make-icons.js` regenerates `assets/branding/logo-{light,dark}.svg`, all app icons and the notification's m6 button; `node branding/make-logo-animation.js` regenerates the animated logo's data |
 | Brand ambassador | Jacinta (AI-generated, see `company/about.md`). `assets/brand_ambassador/jacinta-m6-player.jpg` is a compressed copy of `brand ambassador/jacinta m6 player.png`; used on the first-run onboarding (white top with her and the always-light animated logo, brand-blue `#2563EB` rounded-top panel with the steps, orange icons) |
 | Backgrounds | `assets/backgrounds/`: `music.jpg` (Music tab), `radio.jpg` (Radio tab), `transfer.jpg` (file transfer page and the Home tab) |
-| Legal | Privacy policy https://msixv.com/games/privacy-policy · Terms (EULA) https://msixv.com/games/terms-of-service |
+| Legal | Privacy policy https://msixv.com/games/m6-player/privacy-policy (own page since 2026-10-05; the studio-wide `/games/privacy-policy` describes ads, accounts and telemetry M6 Player doesn't have) · Terms (EULA) https://msixv.com/games/terms-of-service |
 | Repo | https://github.com/Mukiria/m6_player (branch `master`) |
 | Platforms | Android, iOS 14.0+ (equalizer and file transfer are Android only) |
 | Background audio | `audio_service` + `just_audio`, via `lib/services/audio_handler.dart` (notification, lock screen, headset buttons) |
@@ -44,7 +44,8 @@ What that rests on (checked in the code, 2026-10-02):
 - **Stays on the phone**: songs, videos, playlists, favourites, play counts, video resume positions, the Hidden PIN (a salted hash) and settings. There is no analytics, advertising, crash reporting or sign-in package.
 - **Goes online**: (1) the station lists, from radio-browser.info (`lib/services/radio_api.dart`): the request carries the country code (the phone's region, or the country picked) and, for a genre search, the genre, and the service sees the phone's IP address like any website would; (2) a playing station's stream, straight from that station's own server (which sees the IP address); (3) the Privacy policy and Terms links, which open in the browser.
 - **Leaves only when the user chooses**: Share (to the app picked, including a backup file) and Wi-Fi Direct file transfer (straight to the other phone).
-- **To check**: that the published privacy policy at msixv.com mentions the radio lookups, and that the Play Console data-safety form matches the list above.
+- **Policy page** (2026-10-05): written in `msixv/src/legal/m6PlayerPrivacy.ts` (React page + static snapshot), **not yet deployed to msixv.com**. The app's top-bar ⋮ → Privacy policy now opens an in-app summary (`lib/screens/privacy_screen.dart`) with a "Read the full policy" link. Not yet built or run.
+- **To check**: that the Play Console data-safety form matches the list above, and that the Play Console data-safety form matches the list above.
 
 ## Selling points (USPs) for promotion and ads
 
