@@ -60,6 +60,12 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+            // Ask AGP to put native debug symbols in the .aab. On its own this yields
+            // nothing for Flutter (libflutter.so ships stripped); the CI step "List native
+            // debug symbols" shows what actually lands in BUNDLE-METADATA.
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
         }
     }
 }
